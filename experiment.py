@@ -3,7 +3,7 @@
 # Imports
 ##########################################################################################
 from markupsafe import Markup
-from typing import Union, Dict
+from typing import Union, List
 
 import psynet.experiment
 from psynet.modular_page import ImagePrompt, ModularPage, PushButtonControl, NullControl
@@ -21,6 +21,7 @@ from psynet.trial.create_and_rate import CreateAndRateNodeMixin
 
 
 from .custom_pages import SliderSettingPage
+from .game_parameters import NUM_FORAGERS
 
 logger = get_logger()
 
@@ -38,9 +39,9 @@ class DummyControl(NullControl):
     def __init__(self):
         super().__init__()
 
-    def format_answer(self, raw_answer, **kwargs) -> Union[Dict[str, int], str]:
+    def format_answer(self, raw_answer, **kwargs) -> Union[List[str], str]:
         try:
-            answer ={"A": 1, "B":2}
+            answer = ["A", "B"]
             return answer
         except (ValueError, AssertionError) as e:
             logger.info(f"Error: {e}")
@@ -55,7 +56,7 @@ class CreateTrial(CreateTrialMixin, ImitationChainTrial):
 
         list_of_pages = [
             ModularPage(
-                "assignments",
+                "positions",
                 animal_prompt(text="Describe the animal", img_url=self.context["img_url"]),
                 DummyControl(),
                 time_estimate=self.time_estimate,
@@ -64,17 +65,10 @@ class CreateTrial(CreateTrialMixin, ImitationChainTrial):
                 dimension="overhead",
                 start_value=0.5,
                 time_estimate=self.time_estimate,
-            ),
-            CodeBlock(
-                lambda participant: self.initialize_assigments(participant),
             )
         ]
 
         return list_of_pages
-
-    def initialize_assigments(self, participant) -> None:
-        assignments = {trial.id:None for trial in participant._current_trial.node.all_trials}
-        participant._current_trial.node.vars["assignments"] = assignments
 
 
 class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
@@ -83,20 +77,11 @@ class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
     def show_trial(self, experiment, participant):
         assert self.trial_maker.target_selection_method == "one"
 
-        assert len(self.targets) == 1
-        target = self.targets[0]
-        answers = self.get_target_answer(target)
-
-        logger.info(f"Answers (type={type(answers)}: {answers}")
-        creation = answers["assignments"]
-
-        logger.info(f"OKOKO{participant._current_trial.node.vars["assignments"]}")
-
         list_of_pages = [
             ModularPage(
                 "rate_trial",
                 animal_prompt(
-                    text=f"How well does this description match the animal?<br><strong>{creation}</strong>",
+                    text=f"You have been assigned to position:<br><strong>{self.get_trial_position(participant)}</strong>",
                     img_url=self.context["img_url"],
                 ),
                 PushButtonControl(
@@ -108,6 +93,57 @@ class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
         ]
 
         return list_of_pages
+
+    def get_trial_position(self, participant):
+        """
+        Gets the position of the trial
+        """
+        positions = self.get_positions()
+        forager_id = self.get_forager_id(participant)
+        return positions[forager_id]
+
+    def get_positions(self) -> List[int]:
+        """
+        Gets the positions of the foragers provided by the coordinator
+        """
+        assert len(self.targets) == 1
+        target = self.targets[0]
+        answers = self.get_target_answer(target)
+        return answers["positions"]
+
+    def get_forager_id(self, participant) -> int:
+        """
+        Checks if trial is assigned a forager id and, if not, give it one.
+
+        The convention I'm following is:
+            - trial ids must be coerced to strings
+            - forager ids must be coerced to integers
+        """
+        try:
+            assignments = participant._current_trial.node.vars["assignments"]
+        except:
+            assignments = dict()
+            participant._current_trial.node.vars["assignments"] = assignments
+
+        logger.info(f"Assignments old: {assignments}")
+
+        trial_id = str(participant.id)
+
+        if trial_id in assignments.keys():
+            idx = assignments[trial_id]
+            idx = int(idx)
+        else:
+            taken_ids = [int(idx) for idx in assignments.values()]
+            available_ids = [idx for idx in range(NUM_FORAGERS) if idx not in taken_ids]
+            assert(len(available_ids) > 0), f"Error: Attempt to assign forager (participant:{participant.id}) in finished node (node:{participant._current_trial.node.id})."
+            idx = available_ids[0]
+            assignments[trial_id] = idx
+            participant._current_trial.node.vars["assignments"] = assignments
+
+        logger.info(f"Assigning trial {trial_id} to forager id {idx}")
+        logger.info(f"Assignments new: {assignments}")
+
+        return idx
 
     def format_answer(self, raw_answer, **kwargs) -> Union[float, str]:
         try:
@@ -122,11 +158,6 @@ class CreateAndRateTrialMaker(CreateAndRateTrialMakerMixin, ImitationChainTrialM
     pass
 
 class CustomNode(CreateAndRateNodeMixin, ChainNode):
-
-    variables ={
-        "assignments":dict()
-    }
-
     pass
     # def summarize_trials(self, trials: list, experiment, participant) -> None:
     #     pass
@@ -146,6 +177,7 @@ def get_trial_maker():
 
     seed_definition = {
         "overhead": 1,
+        "positions": ["A", "B"],
         "assignments": dict(),
     }
     start_nodes = [
