@@ -6,56 +6,29 @@ from markupsafe import Markup
 from typing import Union, List, Dict, Any
 
 import psynet.experiment
-from psynet.modular_page import Prompt, ModularPage, PushButtonControl, NullControl
+from psynet.modular_page import Prompt, ModularPage, PushButtonControl
 from psynet.timeline import Timeline
 from psynet.trial.create_and_rate import (
     CreateAndRateTrialMakerMixin,
-    CreateTrialMixin,
     RateTrialMixin,
 )
 from psynet.trial.imitation_chain import ImitationChainTrial, ImitationChainTrialMaker
 from psynet.utils import get_logger
-from psynet.trial import ChainNode
-from psynet.trial.create_and_rate import CreateAndRateNodeMixin
 
-from .custom_pages import SliderSettingPage
+from .coordinator_classes import CoordinatorTrial
+from .custom_node import CustomNode
 from .game_parameters import (
     NUM_FORAGERS,
-    INITIAL_POSITIONS
+    INITIAL_POSITIONS,
+    STARTING_SLIDERS,
+    NUM_CENTROIDS,
+    NUM_COINS,
+    DISPERSION,
+    LIST_OF_DISTRIBUTIONS,
+    IMAGE_PATHS,
 )
 
 logger = get_logger()
-
-
-class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
-    time_estimate = 5
-    accumulate_answers = True
-
-    def show_trial(self, experiment, participant):
-
-        list_of_pages = [
-            ModularPage(
-                "positions",
-                Prompt(text="This is a dummy positioning page"),
-                PushButtonControl(
-                    choices=INITIAL_POSITIONS,
-                    labels=["Next"],
-                    arrange_vertically=False,
-                ),
-                time_estimate=self.time_estimate,
-            ),
-            SliderSettingPage(
-                dimension="overhead",
-                start_value=self.get_slider_value(participant),
-                time_estimate=self.time_estimate,
-            )
-        ]
-
-        return list_of_pages
-
-    def get_slider_value(self, participant) -> float:
-        overhead = participant._current_trial.definition["overhead"]
-        return overhead
 
 
 class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
@@ -167,31 +140,6 @@ class CreateAndRateTrialMaker(CreateAndRateTrialMakerMixin, ImitationChainTrialM
         return len(active_trials) > 0
 
 
-class CustomNode(CreateAndRateNodeMixin, ChainNode):
-
-    def create_definition_from_seed(self, seed, experiment, participant):
-        return seed
-
-    def summarize_trials(self, trials: list, experiment, participant) -> Dict[str, Any]:
-        """
-        Reads the new sliders settings from the trials and modifies the seed accordingly
-        """
-        # Get current seed
-        seed = self.seed.copy()
-
-        # Get new overhead
-        coordinator = self.get_coordinator(trials)
-        overhead = coordinator.answer["overhead"]
-
-        # Beget new setting
-        seed["overhead"] = overhead
-        return seed
-
-    def get_coordinator(self, trials):
-        coordinator = [trial for trial in trials if 'coordinator' in str(trial).lower()]
-        assert len(coordinator) == 1
-        return coordinator[0]
-
 ##########################################################################################
 # Experiment
 ##########################################################################################
@@ -199,13 +147,25 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
 
 def get_trial_maker():
 
-    seed_definition = {
-        "overhead": 1,
-        "positions": INITIAL_POSITIONS,
-        "assignments": dict(),
-    }
     start_nodes = [
-        CustomNode(context={"img_url": "static/dog.jpg"}, seed=seed_definition)
+        CustomNode(
+            context=IMAGE_PATHS,
+            seed={
+                # Parameters of the world to be created
+                "world_parameters": {
+                    "num_coins": NUM_COINS,
+                    "num_centroids": NUM_CENTROIDS,
+                    "dispersion": DISPERSION,
+                    "distribution": distribution
+                },
+                # Settings of the social contract
+                "sliders": STARTING_SLIDERS,
+                # Default initial positions of foragers in the world
+                "positions": INITIAL_POSITIONS,
+                # Default empty assignment of foragers to positions
+                "assignments": dict(),
+            }
+        ) for distribution in LIST_OF_DISTRIBUTIONS
     ]
 
     return CreateAndRateTrialMaker(
