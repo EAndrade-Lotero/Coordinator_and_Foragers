@@ -198,9 +198,6 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
 
 
 def get_trial_maker():
-    rater_class = SingleRateTrial
-    n_creators = 1
-    n_raters = 2
 
     seed_definition = {
         "overhead": 1,
@@ -212,11 +209,11 @@ def get_trial_maker():
     ]
 
     return CreateAndRateTrialMaker(
-        n_creators=n_creators,
-        n_raters=n_raters,
+        n_creators=1,
+        n_raters=NUM_FORAGERS,
         node_class=CustomNode,
         creator_class=CoordinatorTrial,
-        rater_class=rater_class,
+        rater_class=SingleRateTrial,
         # mixin params
         include_previous_iteration=True,
         rate_mode="rate",
