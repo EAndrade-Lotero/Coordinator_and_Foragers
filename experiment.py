@@ -172,15 +172,13 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
         """
         # Get current seed
         seed = self.seed.copy()
-        logger.info(f"Current overhead: {seed["overhead"]}")
 
+        # Get new overhead
         coordinator = self.get_coordinator(trials)
         overhead = coordinator.answer["overhead"]
-        logger.info(f"Overhead found from coordinator: {overhead}")
 
+        # Inherit new setting
         seed["overhead"] = overhead
-        logger.info(f"New seed: {seed}")
-
         return seed
 
     def get_coordinator(self, trials):
