@@ -3,7 +3,7 @@
 # Imports
 ##########################################################################################
 from markupsafe import Markup
-from typing import Union, List
+from typing import Union, List, Dict, Any
 
 import psynet.experiment
 from psynet.modular_page import ImagePrompt, ModularPage, PushButtonControl, NullControl
@@ -48,7 +48,7 @@ class DummyControl(NullControl):
             return f"INVALID_RESPONSE"
 
 
-class CreateTrial(CreateTrialMixin, ImitationChainTrial):
+class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
     time_estimate = 5
     accumulate_answers = True
 
@@ -63,12 +63,16 @@ class CreateTrial(CreateTrialMixin, ImitationChainTrial):
             ),
             SliderSettingPage(
                 dimension="overhead",
-                start_value=0.5,
+                start_value=self.get_slider_value(participant),
                 time_estimate=self.time_estimate,
             )
         ]
 
         return list_of_pages
+
+    def get_slider_value(self, participant) -> float:
+        overhead = participant._current_trial.definition["overhead"]
+        return overhead
 
 
 class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
@@ -158,9 +162,31 @@ class CreateAndRateTrialMaker(CreateAndRateTrialMakerMixin, ImitationChainTrialM
     pass
 
 class CustomNode(CreateAndRateNodeMixin, ChainNode):
-    pass
-    # def summarize_trials(self, trials: list, experiment, participant) -> None:
-    #     pass
+
+    def create_definition_from_seed(self, seed, experiment, participant):
+        return seed
+
+    def summarize_trials(self, trials: list, experiment, participant) -> Dict[str, Any]:
+        """
+        Reads the new sliders settings from the trials and modifies the seed accordingly
+        """
+        # Get current seed
+        seed = self.seed.copy()
+        logger.info(f"Current overhead: {seed["overhead"]}")
+
+        coordinator = self.get_coordinator(trials)
+        overhead = coordinator.answer["overhead"]
+        logger.info(f"Overhead found from coordinator: {overhead}")
+
+        seed["overhead"] = overhead
+        logger.info(f"New seed: {seed}")
+
+        return seed
+
+    def get_coordinator(self, trials):
+        coordinator = [trial for trial in trials if 'coordinator' in str(trial).lower()]
+        assert len(coordinator) == 1
+        return coordinator[0]
 
 ##########################################################################################
 # Experiment
@@ -171,9 +197,6 @@ def get_trial_maker():
     rater_class = SingleRateTrial
     n_creators = 1
     n_raters = 2
-    rate_mode = "rate"
-    include_previous_iteration = True
-    target_selection_method = "one"
 
     seed_definition = {
         "overhead": 1,
@@ -181,19 +204,19 @@ def get_trial_maker():
         "assignments": dict(),
     }
     start_nodes = [
-        CreateAndRateNode(context={"img_url": "static/dog.jpg"}, seed=seed_definition)
+        CustomNode(context={"img_url": "static/dog.jpg"}, seed=seed_definition)
     ]
 
     return CreateAndRateTrialMaker(
         n_creators=n_creators,
         n_raters=n_raters,
         node_class=CustomNode,
-        creator_class=CreateTrial,
+        creator_class=CoordinatorTrial,
         rater_class=rater_class,
         # mixin params
-        include_previous_iteration=include_previous_iteration,
-        rate_mode=rate_mode,
-        target_selection_method=target_selection_method,
+        include_previous_iteration=True,
+        rate_mode="rate",
+        target_selection_method="one",
         verbose=True,  # for the demo
         # trial_maker params
         id_="coordinator_and_foragers_trial_maker",
