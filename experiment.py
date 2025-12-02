@@ -6,10 +6,9 @@ from markupsafe import Markup
 from typing import Union, List, Dict, Any
 
 import psynet.experiment
-from psynet.modular_page import ImagePrompt, ModularPage, PushButtonControl, NullControl
-from psynet.timeline import Timeline, CodeBlock
+from psynet.modular_page import Prompt, ModularPage, PushButtonControl, NullControl
+from psynet.timeline import Timeline
 from psynet.trial.create_and_rate import (
-    CreateAndRateNode,
     CreateAndRateTrialMakerMixin,
     CreateTrialMixin,
     RateTrialMixin,
@@ -19,33 +18,13 @@ from psynet.utils import get_logger
 from psynet.trial import ChainNode
 from psynet.trial.create_and_rate import CreateAndRateNodeMixin
 
-
 from .custom_pages import SliderSettingPage
-from .game_parameters import NUM_FORAGERS
+from .game_parameters import (
+    NUM_FORAGERS,
+    INITIAL_POSITIONS
+)
 
 logger = get_logger()
-
-
-def animal_prompt(text, img_url):
-    return ImagePrompt(
-        url=img_url,
-        text=Markup(text),
-        width="300px",
-        height="300px",
-    )
-
-class DummyControl(NullControl):
-
-    def __init__(self):
-        super().__init__()
-
-    def format_answer(self, raw_answer, **kwargs) -> Union[List[str], str]:
-        try:
-            answer = ["A", "B"]
-            return answer
-        except (ValueError, AssertionError) as e:
-            logger.info(f"Error: {e}")
-            return f"INVALID_RESPONSE"
 
 
 class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
@@ -57,8 +36,12 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
         list_of_pages = [
             ModularPage(
                 "positions",
-                animal_prompt(text="Describe the animal", img_url=self.context["img_url"]),
-                DummyControl(),
+                Prompt(text="This is a dummy positioning page"),
+                PushButtonControl(
+                    choices=INITIAL_POSITIONS,
+                    labels=["Next"],
+                    arrange_vertically=False,
+                ),
                 time_estimate=self.time_estimate,
             ),
             SliderSettingPage(
@@ -84,10 +67,7 @@ class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
         list_of_pages = [
             ModularPage(
                 "rate_trial",
-                animal_prompt(
-                    text=f"You have been assigned to position:<br><strong>{self.get_trial_position(participant)}</strong>",
-                    img_url=self.context["img_url"],
-                ),
+                Prompt(text=f"You have been assigned to position: {self.get_trial_position(participant)}"),
                 PushButtonControl(
                     choices=[1],
                     labels=["Next"],
@@ -159,7 +139,33 @@ class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
 
 
 class CreateAndRateTrialMaker(CreateAndRateTrialMakerMixin, ImitationChainTrialMaker):
-    pass
+    response_timeout_sec = 300 # (200% of the estimated time)
+    allow_revisiting_networks_in_across_chains = False
+
+    def custom_network_filter(self, candidates, participant) -> List[Any]:
+        """
+        # Filter out networks with active trials
+        """
+        logger.info("Applying custom network filter...")
+        # Exclude networks with active trials
+        filtered_networks = [
+            network for network in candidates
+            if (
+                not self.has_active_trials(network)
+            )
+        ]
+        return filtered_networks
+
+    def has_active_trials(self, network: Any) -> bool:
+        active_trials = [
+            trial.id for trial in network.all_trials
+            if (
+                trial.finalized == False
+                and trial.failed == False
+            )
+        ]
+        return len(active_trials) > 0
+
 
 class CustomNode(CreateAndRateNodeMixin, ChainNode):
 
@@ -177,7 +183,7 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
         coordinator = self.get_coordinator(trials)
         overhead = coordinator.answer["overhead"]
 
-        # Inherit new setting
+        # Beget new setting
         seed["overhead"] = overhead
         return seed
 
@@ -198,7 +204,7 @@ def get_trial_maker():
 
     seed_definition = {
         "overhead": 1,
-        "positions": ["A", "B"],
+        "positions": INITIAL_POSITIONS,
         "assignments": dict(),
     }
     start_nodes = [
