@@ -8,9 +8,9 @@
     "folder_name": "Coordinator_and_Foragers",
     "secret": {
         "py/object": "uuid.UUID",
-        "hex": "b4723422447b415d9d1780bb7a3dfb3f"
+        "hex": "74e504c867bf45d7a5f7b97bfbbcb478"
     },
     "origin": "https://github.com/EAndrade-Lotero/Coordinator_and_Foragers.git",
-    "deployment_id": "coordinators-and-foragers-experiment__mode=debug__launch=2025-12-02--15-51-52",
+    "deployment_id": "coordinators-and-foragers-experiment__mode=debug__launch=2025-12-02--19-11-13",
     "locale": "en"
 }

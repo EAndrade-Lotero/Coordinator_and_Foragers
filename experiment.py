@@ -2,7 +2,8 @@
 ##########################################################################################
 # Imports
 ##########################################################################################
-from markupsafe import Markup
+import ast
+# from markupsafe import Markup
 from typing import Union, List, Dict, Any
 
 import psynet.experiment
@@ -65,8 +66,26 @@ class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
         """
         assert len(self.targets) == 1
         target = self.targets[0]
-        answers = self.get_target_answer(target)
-        return answers["positions"]
+        logger.info(f"First pass at target obtained type {type(target)}")
+        if isinstance(target, CustomNode):
+            target = self.get_target_answer(target)
+            logger.info(f"A second pass was needed and obtained type {type(target)}")
+        if isinstance(target, CoordinatorTrial):
+            answers = self.get_target_answer(target)
+        elif isinstance(target, dict):
+            answers = target
+        else:
+            raise Exception(f"Unexpected type {type(target)}")
+        assert isinstance(answers, dict), f"Error: Expected dict, got {type(answers)}."
+        positions = answers["positions"]
+        if isinstance(positions, str):
+            try:
+                positions = ast.literal_eval(positions)
+            except Exception as e:
+                logger.error(f"Error parsing {positions}")
+                raise e
+        logger.info(f"Positions obtained {positions}")
+        return positions
 
     def get_forager_id(self, participant) -> int:
         """

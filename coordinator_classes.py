@@ -87,111 +87,36 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 "positions",
                 Prompt(text="This is a dummy positioning page"),
                 PushButtonControl(
-                    choices=INITIAL_POSITIONS,
+                    choices=[INITIAL_POSITIONS],
                     labels=["Next"],
                     arrange_vertically=False,
                 ),
                 time_estimate=self.time_estimate,
             ),
-            for_loop(
-                label="slider_setting",
-                iterate_over=lambda: ["overhead", "wages", "prerogative"],
-                logic=lambda parameter: SliderSettingPage(
-                    dimension=parameter,
-                    start_value=participant._current_trial.definition["sliders"][parameter],
-                    time_estimate=self.time_estimate,
-                ),
-                time_estimate_per_iteration=5,
+            SliderSettingPage(
+                dimension="overhead",
+                start_value=self.get_slider_value(participant, "overhead"),
+                time_estimate=self.time_estimate,
             ),
+            # for_loop(
+            #     label="slider_setting",
+            #     iterate_over=lambda: ["overhead", "wages", "prerogative"],
+            #     logic=lambda parameter: SliderSettingPage(
+            #         dimension=parameter,
+            #         start_value=self.get_slider_value(participant, parameter),
+            #         time_estimate=self.time_estimate,
+            #     ),
+            #     time_estimate_per_iteration=5,
+            # ),
         ]
 
         return list_of_pages
 
+    def get_slider_value(self, participant, parameter) -> float:
+        value = participant._current_trial.definition["sliders"][parameter]
+        if isinstance(value, tuple):
+            value = value[0]
+        assert isinstance(value, float), f"Error: expected float, got {type(value)} --- ({value=})."
+        return value
 
-# class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
-#     time_estimate = 5
-#     accumulate_answers = True
-#
-#     def show_trial(self, experiment, participant) -> List[Any]:
-#
-#         logger.info(f"Participant {participant.id} has the role COORDINATOR")
-#
-#         list_of_pages = [
-#             # Greetings
-#             InfoPage("""HERE THE INSTRUCTIONS"""),
-#             # Asks coordinator to invest
-#             InvestingPage(time_estimate=self.time_estimate),
-#             # Asks the coordinator to assign foragers to positions
-#             ModularPage(
-#                 "forager_positions",
-#                 HelloPrompt(
-#                     username="Coordinator",
-#                     text=Markup(
-#                         """
-#                         <h3>Position foragers</h3>
-#                         <p>Please position all the foragers on the map below.</p>
-#                         """
-#                     )
-#                 ),
-#                 PositioningControl(
-#                     world=participant._current_trial.definition["world"],
-#                     context=self.context,
-#                     investment=participant.answer.get("investment"),
-#                 ),
-#                 time_estimate=self.time_estimate,
-#             ),
-#             # Informs the reward
-#             InfoPage(
-#                 RewardProcessing.get_reward_text(
-#                     n_coins=participant._current_trial.definition["wealth"],
-#                     slider=participant._current_trial.definition["sliders"],
-#                     trial_type="coordinator"
-#                 ),
-#                 time_estimate=5
-#             ),
-#             # WellBeingReportPage(
-#             #     time_estimate=self.time_estimate,
-#             # ),
-#             #
-#             for_loop(
-#                 label="slider_setting",
-#                 iterate_over=lambda: ["overhead", "wages"],
-#                 logic=lambda parameter: SliderSettingPage(
-#                     dimension=parameter,
-#                     start_value=participant._current_trial.definition["sliders"][parameter],
-#                     time_estimate=self.time_estimate,
-#                 ),
-#                 time_estimate_per_iteration=5,
-#             ),
-#             CodeBlock(
-#                 lambda participant: self.set_node_state(participant),
-#             )
-#         ]
-#         return list_of_pages
-#
-#     def set_node_state(self, participant) -> None:
-#         """
-#         Initializes the foragers ids to be taken by subsequent forager trials
-#         """
-#         forager_positions = participant.answers["forager_positions"]
-#         assignments = {
-#             forager_id: None for forager_id in forager_positions.keys()
-#         }
-#         participant._current_trial.vars.assignments = assignments
-#
-#     def set_node_investment(self, participant) -> None:
-#         investment = participant.answers["investment"]
-#         assert(investment is not None)
-#         participant._current_trial.vars.investment = investment
-#
-#     def format_answer(self, raw_answer, **kwargs) -> Union[Dict[str, Any], str]:
-#         logger.info(f"Formatting the coordinator trial answer: {raw_answer}")
-#         try:
-#             assert(isinstance(raw_answer, dict))
-#             assert('assign_foragers' in raw_answer.keys())
-#             assert('overhead' in raw_answer.keys())
-#             return raw_answer
-#         except (ValueError, AssertionError):
-#             return f"INVALID_RESPONSE"
 
-###########################################
