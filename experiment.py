@@ -2,7 +2,8 @@
 ##########################################################################################
 # Imports
 ##########################################################################################
-from markupsafe import Markup
+# from markupsafe import Markup
+import ast
 from typing import Union, List, Dict, Any
 
 import psynet.experiment
@@ -15,8 +16,6 @@ from psynet.trial.create_and_rate import (
 )
 from psynet.trial.imitation_chain import ImitationChainTrial, ImitationChainTrialMaker
 from psynet.utils import get_logger
-from psynet.trial import ChainNode
-from psynet.trial.create_and_rate import CreateAndRateNodeMixin
 
 from .custom_pages import SliderSettingPage
 from .custom_node import CustomNode
@@ -47,12 +46,19 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
             ),
             SliderSettingPage(
                 dimension="overhead",
-                start_value=participant._current_trial.definition["overhead"],
+                start_value=self.get_slider_value(participant, "overhead"),
                 time_estimate=self.time_estimate,
             )
         ]
 
         return list_of_pages
+
+    def get_slider_value(self, participant, parameter) -> float:
+        value = participant._current_trial.definition[parameter]
+        if isinstance(value, tuple):
+            value = value[0]
+        assert isinstance(value, float), f"Error: expected float, got {type(value)} --- {value=}"
+        return value
 
 
 class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
@@ -93,10 +99,22 @@ class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
         if isinstance(target, CustomNode):
             target = self.get_target_answer(target)
             logger.info(f"A second pass was needed and obtained type {type(target)}")
-        assert isinstance(target, CoordinatorTrial), f"Error: Expected CoordinatorTrial, got {type(target)}."
-        answers = self.get_target_answer(target)
+        if isinstance(target, CoordinatorTrial):
+            answers = self.get_target_answer(target)
+        elif isinstance(target, dict):
+            answers = target
+        else:
+            raise Exception(f"Unexpected type {type(target)}")
         assert isinstance(answers, dict), f"Error: Expected dict, got {type(answers)}."
-        return answers["positions"]
+        positions = answers["positions"]
+        if isinstance(positions, str):
+            try:
+                positions = ast.literal_eval(positions)
+            except Exception as e:
+                logger.error(f"Error parsing {positions}")
+                raise e
+        logger.info(f"Positions obtained {positions}")
+        return positions
 
     def get_forager_id(self, participant) -> int:
         """
@@ -169,32 +187,6 @@ class CreateAndRateTrialMaker(CreateAndRateTrialMakerMixin, ImitationChainTrialM
         ]
         return len(active_trials) > 0
 
-
-class CustomNode(CreateAndRateNodeMixin, ChainNode):
-
-    def create_definition_from_seed(self, seed, experiment, participant):
-        return seed
-
-    def summarize_trials(self, trials: list, experiment, participant) -> Dict[str, Any]:
-        """
-        Reads the new sliders settings from the trials and modifies the seed accordingly
-        """
-        # Get current seed
-        seed = self.seed.copy()
-
-        # Get new overhead
-        coordinator = self.get_coordinator(trials)
-        overhead = coordinator.answer["overhead"]
-
-        # Beget new setting
-        seed["overhead"] = overhead
-        return seed
-
-    def get_coordinator(self, trials):
-        coordinator = [trial for trial in trials if 'coordinator' in str(trial).lower()]
-        assert len(coordinator) == 1
-        return coordinator[0]
-
 ##########################################################################################
 # Experiment
 ##########################################################################################
@@ -203,7 +195,7 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
 def get_trial_maker():
 
     seed_definition = {
-        "overhead": 1,
+        "overhead": 1.0,
         "positions": INITIAL_POSITIONS,
         "assignments": dict(),
     }
