@@ -98,6 +98,16 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 start_value=self.get_slider_value(participant, "overhead"),
                 time_estimate=self.time_estimate,
             ),
+            SliderSettingPage(
+                dimension="wages",
+                start_value=self.get_slider_value(participant, "wages"),
+                time_estimate=self.time_estimate,
+            ),
+            SliderSettingPage(
+                dimension="prerogative",
+                start_value=self.get_slider_value(participant, "prerogative"),
+                time_estimate=self.time_estimate,
+            ),
             # for_loop(
             #     label="slider_setting",
             #     iterate_over=lambda: ["overhead", "wages", "prerogative"],
