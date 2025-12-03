@@ -6,7 +6,7 @@ from markupsafe import Markup
 from typing import Union, List, Dict, Any
 
 import psynet.experiment
-from psynet.modular_page import Prompt, ModularPage, PushButtonControl, NullControl
+from psynet.modular_page import Prompt, ModularPage, PushButtonControl
 from psynet.timeline import Timeline
 from psynet.trial.create_and_rate import (
     CreateAndRateTrialMakerMixin,
@@ -19,6 +19,7 @@ from psynet.trial import ChainNode
 from psynet.trial.create_and_rate import CreateAndRateNodeMixin
 
 from .custom_pages import SliderSettingPage
+from .custom_node import CustomNode
 from .game_parameters import (
     NUM_FORAGERS,
     INITIAL_POSITIONS
@@ -38,7 +39,7 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 "positions",
                 Prompt(text="This is a dummy positioning page"),
                 PushButtonControl(
-                    choices=INITIAL_POSITIONS,
+                    choices=[INITIAL_POSITIONS],
                     labels=["Next"],
                     arrange_vertically=False,
                 ),
@@ -46,16 +47,12 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
             ),
             SliderSettingPage(
                 dimension="overhead",
-                start_value=self.get_slider_value(participant),
+                start_value=participant._current_trial.definition["overhead"],
                 time_estimate=self.time_estimate,
             )
         ]
 
         return list_of_pages
-
-    def get_slider_value(self, participant) -> float:
-        overhead = participant._current_trial.definition["overhead"]
-        return overhead
 
 
 class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
@@ -92,7 +89,13 @@ class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
         """
         assert len(self.targets) == 1
         target = self.targets[0]
+        logger.info(f"First pass at target obtained type {type(target)}")
+        if isinstance(target, CustomNode):
+            target = self.get_target_answer(target)
+            logger.info(f"A second pass was needed and obtained type {type(target)}")
+        assert isinstance(target, CoordinatorTrial), f"Error: Expected CoordinatorTrial, got {type(target)}."
         answers = self.get_target_answer(target)
+        assert isinstance(answers, dict), f"Error: Expected dict, got {type(answers)}."
         return answers["positions"]
 
     def get_forager_id(self, participant) -> int:
