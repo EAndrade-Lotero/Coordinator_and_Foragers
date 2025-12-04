@@ -4,7 +4,7 @@
 ##########################################################################################
 # from markupsafe import Markup
 import ast
-from typing import Union, List, Dict, Any
+from typing import Union, List, Any
 
 import psynet.experiment
 from psynet.modular_page import Prompt, ModularPage, PushButtonControl
@@ -197,7 +197,6 @@ def get_trial_maker():
     seed_definition = {
         "overhead": 1.0,
         "positions": INITIAL_POSITIONS,
-        "assignments": dict(),
     }
     start_nodes = [
         CustomNode(context={"img_url": "static/dog.jpg"}, seed=seed_definition)
