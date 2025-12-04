@@ -161,6 +161,7 @@ class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
 
 class CreateAndRateTrialMaker(CreateAndRateTrialMakerMixin, ImitationChainTrialMaker):
     response_timeout_sec = 300 # (200% of the estimated time)
+    check_timeout_interval_sec = 30
     allow_revisiting_networks_in_across_chains = False
 
     def custom_network_filter(self, candidates, participant) -> List[Any]:
@@ -187,6 +188,7 @@ class CreateAndRateTrialMaker(CreateAndRateTrialMakerMixin, ImitationChainTrialM
         ]
         return len(active_trials) > 0
 
+
 ##########################################################################################
 # Experiment
 ##########################################################################################
@@ -199,7 +201,7 @@ def get_trial_maker():
         "positions": INITIAL_POSITIONS,
     }
     start_nodes = [
-        CustomNode(context={"img_url": "static/dog.jpg"}, seed=seed_definition)
+        CustomNode(context={}, seed=seed_definition)
     ]
 
     return CreateAndRateTrialMaker(
