@@ -8,11 +8,11 @@ from markupsafe import Markup
 #     Any, Union, List, Dict
 # )
 
+from psynet.page import InfoPage
 from psynet.utils import get_logger
-from psynet.timeline import (
-    # CodeBlock,
-    for_loop,
-)
+# from psynet.timeline import (
+#     for_loop,
+# )
 from psynet.modular_page import (
     ModularPage,
     Prompt,
@@ -26,6 +26,7 @@ from .custom_pages import (
     SliderSettingPage,
 )
 from .game_parameters import INITIAL_POSITIONS
+from .text_variables import COORDINATOR_INSTRUCTIONS
 
 logger = get_logger()
 
@@ -83,6 +84,10 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
     def show_trial(self, experiment, participant):
 
         list_of_pages = [
+            InfoPage(
+                Markup(COORDINATOR_INSTRUCTIONS),
+                time_estimate=5
+            ),
             ModularPage(
                 "positions",
                 Prompt(text="This is a dummy positioning page"),

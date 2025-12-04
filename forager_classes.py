@@ -4,8 +4,10 @@
 # Imports
 ##########################################################################################
 import ast
+from markupsafe import Markup
 from typing import List, Union
 
+from psynet.page import InfoPage
 from psynet.utils import get_logger
 from psynet.modular_page import (
     ModularPage,
@@ -18,6 +20,7 @@ from psynet.trial.imitation_chain import ImitationChainTrial
 from .custom_node import CustomNode
 from .coordinator_classes import CoordinatorTrial
 from .game_parameters import NUM_FORAGERS
+from .text_variables import FORAGER_INSTRUCTIONS
 
 logger = get_logger()
 
@@ -40,6 +43,10 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         assert self.trial_maker.target_selection_method == "one"
 
         list_of_pages = [
+            InfoPage(
+                Markup(FORAGER_INSTRUCTIONS),
+                time_estimate=self.time_estimate,
+            ),
             ModularPage(
                 "rate_trial",
                 Prompt(text=f"You have been assigned to position: {self.get_trial_position(participant)}"),
@@ -48,6 +55,7 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                     labels=["Next"],
                     arrange_vertically=False,
                 ),
+                time_estimate=self.time_estimate,
             )
         ]
 

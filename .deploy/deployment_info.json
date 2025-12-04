@@ -1,0 +1,16 @@
+{
+    "redeploying_from_archive": false,
+    "mode": "debug",
+    "is_local_deployment": true,
+    "is_ssh_deployment": false,
+    "server": null,
+    "app": null,
+    "folder_name": "Coordinator_and_Foragers",
+    "secret": {
+        "py/object": "uuid.UUID",
+        "hex": "c2a59947cf314792ad668cd6f8fb5160"
+    },
+    "origin": "https://github.com/EAndrade-Lotero/Coordinator_and_Foragers.git",
+    "deployment_id": "coordinators-and-foragers-experiment__mode=debug__launch=2025-12-03--10-53-55",
+    "locale": "en"
+}

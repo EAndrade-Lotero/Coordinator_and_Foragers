@@ -2,14 +2,18 @@
 ##########################################################################################
 # Imports
 ##########################################################################################
+from markupsafe import Markup
+
 import psynet.experiment
 from psynet.timeline import Timeline
 from psynet.utils import get_logger
+from psynet.page import InfoPage
 
 from .custom_node import CustomNode
 from .forager_classes import ForagerTrial
 from .coordinator_classes import CoordinatorTrial
 from .custom_trialmaker import CreateAndRateTrialMaker
+from .text_variables import WELCOME_TEXT
 from .game_parameters import (
     NUM_FORAGERS,
     INITIAL_POSITIONS,
@@ -84,5 +88,9 @@ class Exp(psynet.experiment.Experiment):
     initial_recruitment_size = 1
 
     timeline = Timeline(
+        InfoPage(
+            Markup(WELCOME_TEXT),
+            time_estimate=5
+        ),
         get_trial_maker()
     )
