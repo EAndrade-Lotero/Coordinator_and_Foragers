@@ -4,7 +4,7 @@
 ##########################################################################################
 # from markupsafe import Markup
 import ast
-from typing import Union, List, Any
+from typing import Union, List, Any, Dict
 
 import psynet.experiment
 from psynet.modular_page import Prompt, ModularPage, PushButtonControl
@@ -16,6 +16,7 @@ from psynet.trial.create_and_rate import (
 )
 from psynet.trial.imitation_chain import ImitationChainTrial, ImitationChainTrialMaker
 from psynet.utils import get_logger
+from sqlalchemy.testing import assert_warns
 
 from .custom_pages import SliderSettingPage
 from .custom_node import CustomNode
@@ -61,13 +62,23 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
         return value
 
 
-class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
+class ForagerTrial(RateTrialMixin, ImitationChainTrial):
     time_estimate = 5
+    accumulate_answers = True
 
     def show_trial(self, experiment, participant):
         assert self.trial_maker.target_selection_method == "one"
 
         list_of_pages = [
+            ModularPage(
+                "forager_id",
+                Prompt(text=f"Congratulations! You are a forager!"),
+                PushButtonControl(
+                    choices=[self.get_forager_id(participant)],
+                    labels=["Next"],
+                    arrange_vertically=False,
+                ),
+            ),
             ModularPage(
                 "rate_trial",
                 Prompt(text=f"You have been assigned to position: {self.get_trial_position(participant)}"),
@@ -85,75 +96,101 @@ class SingleRateTrial(RateTrialMixin, ImitationChainTrial):
         """
         Gets the position of the trial
         """
-        positions = self.get_positions()
+        positions = self.get_positions(participant)
         forager_id = self.get_forager_id(participant)
-        return positions[forager_id]
+        position = positions[forager_id]
+        logger.info(f"Trial {forager_id} has position {position}")
+        return position
 
-    def get_positions(self) -> List[int]:
+    def get_positions(self, participant) -> List[int]:
         """
         Gets the positions of the foragers provided by the coordinator
         """
-        assert len(self.targets) == 1
-        target = self.targets[0]
-        logger.info(f"First pass at target obtained type {type(target)}")
-        if isinstance(target, CustomNode):
-            target = self.get_target_answer(target)
-            logger.info(f"A second pass was needed and obtained type {type(target)}")
-        if isinstance(target, CoordinatorTrial):
-            answers = self.get_target_answer(target)
-        elif isinstance(target, dict):
-            answers = target
-        else:
-            raise Exception(f"Unexpected type {type(target)}")
-        assert isinstance(answers, dict), f"Error: Expected dict, got {type(answers)}."
-        positions = answers["positions"]
+        # Get current node
+        current_node = participant.current_trial.node
+        # Get answers.
+        coordinator_answers = self.get_answers_from_role('coordinator', current_node)
+        assert len(coordinator_answers) == 1, f"Error: Found more than one coordinator in node {current_node.id}"
+        coordinator_answers = coordinator_answers[0]
+        # Extract positions from answers
+        assert "positions" in coordinator_answers.keys(), f"Error: Found no positions in coordinator's answers: {coordinator_answers.keys()}"
+        positions = coordinator_answers["positions"]
+        # Verify type of positions
         if isinstance(positions, str):
             try:
                 positions = ast.literal_eval(positions)
             except Exception as e:
                 logger.error(f"Error parsing {positions}")
                 raise e
+        assert isinstance(positions, list), f"Error: expected list, got {type(positions)}"
         logger.info(f"Positions obtained {positions}")
         return positions
 
     def get_forager_id(self, participant) -> int:
         """
         Checks if trial is assigned a forager id and, if not, give it one.
-
-        The convention I'm following is:
-            - trial ids must be coerced to strings
-            - forager ids must be coerced to integers
         """
+        # Useful records
+        trial_id = str(participant.current_trial.id)
+        current_node = participant.current_trial.node
+        # Check if I have a forager id.
         try:
-            assignments = participant._current_trial.node.vars["assignments"]
+            forager_id = participant.current_trial.vars["forager_id"]
+            forager_id = int(forager_id)
         except:
-            assignments = dict()
-            participant._current_trial.node.vars["assignments"] = assignments
-
-        logger.info(f"Assignments old: {assignments}")
-
-        trial_id = str(participant.id)
-
-        if trial_id in assignments.keys():
-            idx = assignments[trial_id]
-            idx = int(idx)
-        else:
-            taken_ids = [int(idx) for idx in assignments.values()]
+            # No forager id yet
+            # Determining forager ids from other foragers
+            # First, get the answers from other forager trials
+            other_foragers_answers = self.get_answers_from_role('forager', current_node)
+            # Determine the taken ids
+            taken_ids = [answer["forager_id"] for answer in other_foragers_answers]
+            taken_ids = [int(idx) for idx in taken_ids]
+            # Get a list of available ids
             available_ids = [idx for idx in range(NUM_FORAGERS) if idx not in taken_ids]
-            assert(len(available_ids) > 0), f"Error: Attempt to assign forager (participant:{participant.id}) in finished node (node:{participant._current_trial.node.id})."
-            idx = available_ids[0]
-            assignments[trial_id] = idx
-            participant._current_trial.node.vars["assignments"] = assignments
+            assert(len(available_ids) > 0), f"Error: Attempt to assign forager (trial:{trial_id}) in node (node:{participant.current_trial.node.id})."
+            # Get the first available id as a forager_id
+            forager_id = available_ids[0]
+            # Register forager id in working memory for the trial
+            participant.current_trial.vars["forager_id"] = forager_id
 
-        logger.info(f"Assigning trial {trial_id} to forager id {idx}")
-        logger.info(f"Assignments new: {assignments}")
+        logger.info(f"Trial {trial_id} was assigned to forager id {forager_id}")
+        return forager_id
 
-        return idx
+    def get_answers_from_role(self, role:str, node:CustomNode) -> List[Dict[str, Any]]:
+        """Gets the answers from the trial or trials of the given rol"""
+        """
+        Gets the positions of the foragers provided by the coordinator
+        """
+        assert role in ['coordinator', 'forager'], f"Error: expected 'coordinator' or 'forager', got {role}"
+        # Get the trials that are finalized and not failed that have the required role
+        trials_with_role_in_node = [
+            trial for trial in node.all_trials
+            if (
+                trial.finalized == True
+                and trial.failed == False
+                and role in str(trial).lower()
+            )
+        ]
+        logger.info(f"Found {len(trials_with_role_in_node)} trials with {role} role in node {node.id}")
+        if len(trials_with_role_in_node) == 0:
+            return []
+        # Get answers from trials
+        list_of_answers = [self.get_answers_from_trial(trial) for trial in trials_with_role_in_node]
+        return list_of_answers
+
+    def get_answers_from_trial(self, trial:ImitationChainTrial) -> Dict[str, Any]:
+        """Extract the answers from the given trial"""
+        assert isinstance(trial, ImitationChainTrial), f"Error: expected ImitationChainTrial, got {type(trial)}"
+        # Extract the answer
+        answer = self.get_target_answer(trial)
+        assert isinstance(answer, dict), f"Error: expected dict, got {type(answer)} --- {answer=}"
+        return answer
 
     def format_answer(self, raw_answer, **kwargs) -> Union[float, str]:
         try:
-            answer = raw_answer["rate_trial"]
-            return answer
+            # answer = raw_answer["rate_trial"]
+            # return answer
+            return raw_answer
         except (ValueError, AssertionError) as e:
             logger.info(f"Error: {e}")
             return f"INVALID_RESPONSE"
@@ -209,7 +246,7 @@ def get_trial_maker():
         n_raters=NUM_FORAGERS,
         node_class=CustomNode,
         creator_class=CoordinatorTrial,
-        rater_class=SingleRateTrial,
+        rater_class=ForagerTrial,
         # mixin params
         include_previous_iteration=True,
         rate_mode="rate",
