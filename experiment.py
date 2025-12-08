@@ -67,7 +67,7 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
     accumulate_answers = True
 
     def show_trial(self, experiment, participant):
-        assert self.trial_maker.target_selection_method == "one"
+        assert self.trial_maker.target_selection_method == "all"
 
         list_of_pages = [
             ModularPage(
@@ -250,7 +250,7 @@ def get_trial_maker():
         # mixin params
         include_previous_iteration=True,
         rate_mode="rate",
-        target_selection_method="one",
+        target_selection_method="all",
         verbose=True,  # for the demo
         # trial_maker params
         id_="coordinator_and_foragers_trial_maker",
