@@ -1,0 +1,403 @@
+# Helper classes to be used in the experiment
+import PIL
+import numpy as np
+import matplotlib.pyplot as plt
+
+from pathlib import Path
+from numpy.typing import NDArray
+from matplotlib.offsetbox import (
+    AnnotationBbox,
+    OffsetImage
+)
+from typing import (
+    List, Tuple, Dict, Iterable,
+    Optional, Union, Any
+)
+
+from psynet.utils import get_logger
+
+logger = get_logger()
+
+try:
+    # Assume running from psynet
+    from .game_parameters import (
+        NUM_FORAGERS,
+        INITIAL_WEALTH,
+        RNG,
+    )
+except:
+    # If not, try normal import
+    from game_parameters import (
+        NUM_FORAGERS,
+        INITIAL_WEALTH,
+        RNG,
+    )
+
+
+class World:
+    """2D grid world with coins placed according to a distribution.
+
+    Grid cells contain 1 if a coin is present, otherwise 0.
+    """
+    width: Optional[int] = 4
+    height: Optional[int] = 3
+    coin_path: Path = None
+    map_path: Path = None
+    forager_path = None
+    num_foragers: int = NUM_FORAGERS
+    _rng = RNG
+
+    def __init__(
+        self,
+        num_coins: int,
+        num_centroids: int,
+        distribution: str,
+        dispersion: float,
+    ) -> None:
+        self.num_coins = num_coins
+        self.num_centroids = num_centroids
+        assert(distribution in ["linear", "circular", "oval"]), f"Dispersion {distribution} not supported. Choose from ['linear', 'circular', 'oval']."
+        self.distribution = distribution
+        assert(dispersion > 0), f"Dispersion must be greater than 0 (but got {dispersion})."
+        self.dispersion = dispersion
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("width and height must be positive.")
+        if self.num_coins < 0:
+            raise ValueError("num_coins must be non-negative.")
+        if self.num_coins > self.width * self.height / 10:
+            raise ValueError(f"num_coins cannot exceed {int(self.width * self.height / 10)} (but got {self.num_coins})")
+        self.grid = np.zeros((self.width, self.height))
+        self._place_coins()
+
+    def coin_positions(self) -> List[Tuple[int, int]]:
+        """List of (row, col) positions where coins are present."""
+        coords_x, coords_y = np.where(self.grid == 1)
+        coin_positions = list(zip(coords_x.tolist(), coords_y.tolist()))
+        return coin_positions
+
+    def count_coins(self) -> int:
+        """Return the number of coins currently placed."""
+        return self.grid.sum()
+
+    def clear(self) -> None:
+        """Remove all coins (set all cells to 0)."""
+        self.grid = np.zeros((self.width, self.height))
+
+    def _place_coins(self) -> None:
+        """Dispatch to the chosen distribution strategy."""
+        self.clear()
+        if self.num_coins == 0:
+            return
+
+        coins_per_centroid = self.num_coins // self.num_centroids
+        offset = self.count_coins() - coins_per_centroid * self.num_centroids
+        coins_per_centroid = [coins_per_centroid for _ in range(self.num_centroids)]
+        if offset > 0:
+            coins_per_centroid[-1] += offset
+
+        centroids = self.get_centroids()
+        for i, (x, y) in enumerate(centroids):
+            n_coins = coins_per_centroid[i]
+            sample_coins = self.sample_bivariate_normal(
+                mean=(x, y),
+                cov=((self.dispersion, 0), (0, self.dispersion)),
+                n=n_coins,
+            )
+            coords_x = [int(x) for x, y in sample_coins]
+            coords_y = [int(y) for x, y in sample_coins]
+            self.grid[coords_x, coords_y] = 1
+
+    def get_centroids(self) -> List[Tuple[int, int]]:
+        """Return the centroids of coins placed."""
+        if self.num_centroids == 1:
+            return [(int(self.width / 2), int(self.height / 2))]
+
+        if self.distribution == "linear":
+            sample = np.linspace(0, 1, self.num_centroids + 2)[1:-1]
+            sample = [(int(x * self.width), int(x * self.height)) for x in sample]
+            return sample
+
+        elif self.distribution == "circular":
+            sample = np.linspace(0, 1, self.num_centroids + 1)[:-1]
+            theta = (2.0 * np.pi) * sample
+            x = np.cos(theta).tolist()
+            y = np.sin(theta).tolist()
+            sample = list(zip(x, y))
+
+            x_scale = 0.25 * self.width
+            y_scale = 0.25 * self.height
+            sample = [(x * x_scale, y * y_scale) for x, y in sample]
+            sample = [(x + 0.5 * self.width, y + 0.5 * self.height) for x, y in sample]
+            sample = [(int(x), int(y)) for x, y in sample]
+            return sample
+
+        elif self.distribution == "oval":
+            raise NotImplementedError("oval dispersion is not yet implemented.")
+
+        else:
+            raise NotImplementedError(f"Dispersion {self.distribution} not supported. Choose from ['linear', 'circular', 'oval'].")
+
+    def __str__(self) -> str:
+        """ASCII representation: '1' for coin, '.' for empty."""
+        lines = []
+        for r in range(self.height):
+            line = "".join("1" if self.grid[r][c] else "." for c in range(self.width))
+            lines.append(line)
+        return "\n".join(lines)
+
+    def render(
+        self,
+        bg=(0, 0, 0, 0),
+        fg = (255, 255, 255, 255)
+    ):
+        # ) -> List[List[List[int, int, int]]]:
+        """
+        Convert a 2D binary-like array into an RGBA image array.
+
+        Accepts mask shaped as (height, width) or (width, height).
+        Returns shape (height, width, 4) with dtype uint8.
+        """
+        mask = np.asarray(self.grid)
+
+        # Accept either (height, width) or (width, height)
+        if mask.shape == (self.height, self.width):
+            m = mask
+        elif mask.shape == (self.width, self.height):
+            m = mask.T
+        else:
+            raise ValueError(
+                f"mask shape {mask.shape} doesn't match "
+                f"(height,width)=({self.height},{self.width}) or (width,height)=({self.width},{self.height})"
+            )
+
+        m = m.astype(bool)
+
+        rgba = np.empty((self.height, self.width, 4), dtype=np.uint8)
+        rgba[:] = np.array(fg, dtype=np.uint8)
+        rgba[m] = np.array(bg, dtype=np.uint8)
+
+        return rgba
+
+    def render_(
+        self,
+        show: bool = False,
+        coin_zoom: float = 0.1,
+        coin_percentage: Optional[float] = 1,
+    ) -> NDArray[np.uint8]:
+        """Render the world by drawing coin images at coin positions.
+
+        Args:
+            :param coin_zoom: Relative size of the coin inside a cell (0<zoom<=1).
+            :param show: If True, also display the figure.
+            :param coin_percentage: Probability of drawing a coin.
+        """
+        if not (0 < coin_zoom <= 1.0):
+            raise ValueError("coin_zoom must be in (0, 1].")
+
+        # Canvas sized roughly to grid, independent of DPI
+        fig, ax = plt.subplots(
+            # figsize=(int(self.width / 10), int(self.height / 10)),
+            figsize=(1,1),
+            dpi=100
+        )
+
+        # Light cell grid
+        ax.set_xticks(np.arange(-.5, self.width, 1), minor=True)
+        ax.set_yticks(np.arange(-.5, self.height, 1), minor=True)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_aspect("equal")
+        # ax.set_title("World", pad=8)
+        ax.set_axis_off()
+
+        # Load coin image (RGBA supported)
+        raw_coin_img = plt.imread(self.coin_path)
+        coin_img = OffsetImage(raw_coin_img, zoom=coin_zoom)
+
+        # Place the coin image centered in each occupied cell
+        half = 0.5 * coin_zoom
+        coins = self.coin_positions()
+        for (r, c) in coins:
+            if self._rng.random() < coin_percentage:
+                coin_img.image.axes = ax
+                ab = AnnotationBbox(
+                    coin_img,
+                    (c + half, r + half),
+                    frameon=False
+                )
+                ax.add_artist(ab)
+
+        # Render the figure to a buffer
+        fig.canvas.draw()
+        # Convert to a NumPy array (RGBA)
+        rgba_bytes = fig.canvas.buffer_rgba().tobytes()
+        width, height = fig.canvas.get_width_height()
+        pil_image = PIL.Image.frombytes(mode="RGBA", size=[width, height], data=rgba_bytes)
+        img = np.array(pil_image)
+
+        if show:
+            plt.show()
+        plt.close(fig)
+
+        return img
+
+    def sample_bivariate_normal(
+        self,
+        mean: Iterable[float],
+        cov: Iterable[Iterable[float]],
+        n: int,
+    ) -> List[Tuple[float, float]] | NDArray[np.float64]:
+        """
+        Sample n points from a 2D (bivariate) normal distribution.
+
+        Parameters
+        ----------
+        n : int
+            Number of samples.
+        mean : Iterable[float]
+            Length-2 mean vector [mu_x, mu_y].
+        cov : Iterable[Iterable[float]]
+            2x2 covariance matrix [[var_x, cov_xy], [cov_yx, var_y]].
+
+        Returns
+        -------
+        List[Tuple[float, float]] | NDArray[np.float_]
+            The sampled coordinates.
+        """
+        mean_arr = np.asarray(mean, dtype=float)
+        cov_arr = np.asarray(cov, dtype=float)
+
+        samples: NDArray[np.float64] = self._rng.multivariate_normal(
+            mean=mean_arr,
+            cov=cov_arr,
+            size=n
+        )
+
+        return [tuple(row) for row in samples]
+
+    @staticmethod
+    def generate_rgba_array(w=10, h=10, b=180, a_even=255, a_odd=140):
+        rgba = [
+            [
+                [
+                    round(255 * x / (w - 1)),   # R
+                    round(255 * y / (h - 1)),   # G
+                    b,                          # B
+                    a_even if (x + y) % 2 == 0 else a_odd  # A
+                ]
+                for x in range(w)
+            ]
+            for y in range(h)
+        ]
+        return rgba
+
+class WealthTracker:
+    """Keeps track of the coins throughout iterations"""
+
+    def __init__(self, n_coins:Optional[int]=INITIAL_WEALTH) -> None:
+        self.n_coins = n_coins
+        self.num_foragers: int = NUM_FORAGERS
+        self.coordinator_wealth: Union[float, None] = None
+        self.foragers_wealth: Union[List[float], None] = None
+
+    def update_from_trials(self, trials: List[Any], sliders: Dict[str, float]) -> None:
+        forager_trials = [t for t in trials if 'forager' in str(t).lower()]
+        assert len(forager_trials) == self.num_foragers
+
+        # Get forager production in previous episode
+        foragers_payoffs = self.get_coins_from_foragers(forager_trials)
+        self.n_coins = sum(foragers_payoffs)
+        foragers_proportions = np.array(foragers_payoffs) / self.n_coins
+
+        logger.info(f"Foragers collected {self.n_coins} coins in total last round.")
+        logger.info(f"Foragers proportions: {foragers_proportions}")
+
+        # Get slider parameters
+        assert("overhead" in sliders.keys()), f"Error: sliders has to have an 'overhead' key (observed keys are{sliders.keys()}) )."
+        assert("wages" in sliders.keys()), f"Error: sliders has to have an 'wages' key (observed keys are{sliders.keys()}) )."
+        overhead = sliders["overhead"]
+        wages_proportion = sliders["wages"]
+
+        # Calculate coordinator's wealth
+        self.coordinator_wealth = overhead * self.n_coins
+        remaining = self.n_coins - self.coordinator_wealth
+
+        # Calculate foragers' wealth
+        wages = remaining * wages_proportion
+        remaining = remaining - wages
+        foragers_split = foragers_proportions * remaining
+        self.foragers_wealth = wages + foragers_split
+
+    def get_coins_from_foragers(self, trials: List[Any]) -> NDArray[np.float64]:
+        foragers_payoffs = []
+        for trial in trials:
+            answers = self.get_coins(trial)
+            logger.info(f"{str(trial)} => {answers}")
+            foragers_payoffs.append(answers)
+        return np.array(foragers_payoffs)
+
+    def get_coins(self, trial: Any) -> int:
+        logger.info(f"{hasattr(trial, "vars['coins_foraged']")}")
+        return 10
+
+    def initialize(self, sliders: Dict[str, float]) -> None:
+        # Get slider parameters
+        wages_proportion = sliders["wages"]
+
+        # Calculate coordinator's wealth
+        coordinator_wealth = self.calculate_coordinator_reward(sliders)
+
+        remaining = self.n_coins - self.coordinator_wealth
+
+        # Calculate foragers' wealth
+        wages = remaining * wages_proportion
+        remaining = remaining - wages
+        foragers_split = np.array([remaining / self.num_foragers]) * self.num_foragers
+        self.foragers_wealth = wages + foragers_split
+
+    def calculate_coordinator_reward(self, sliders: Dict[str, float]) -> float:
+        # Get slider parameters
+        overhead = sliders["overhead"]
+        self.coordinator_wealth = overhead * self.n_coins
+        return self.coordinator_wealth
+
+    # def calculate_foragers_reward(self, slider: SliderValues) -> float:
+
+
+    def get_coordinator_wealth(self) -> float:
+        assert(self.coordinator_wealth is not None), "Coordinator wealth is not set yet. Run update() first."
+        return self.coordinator_wealth
+
+    def get_forager_wealth(self, forager_id: int) -> float:
+        assert(self.foragers_wealth is not None), "Forager wealth is not set yet. Run update() first."
+        return self.foragers_wealth[forager_id]
+
+
+class RewardProcessing:
+    """Processes rewards and gives feedback"""
+
+    @staticmethod
+    def get_reward_text(
+        n_coins: int,
+        slider: Any,
+        trial_type: str
+    ) -> str:
+        trial_types = ["coordinator"] + [f"forager-{i}" for i in range(NUM_FORAGERS)]
+        assert(trial_type in trial_types), f"Invalid trial type. Expected one of {trial_types} but got {trial_type}."
+
+        # Get
+        accumulated_wealth = WealthTracker(n_coins)
+        accumulated_wealth.initialize(slider)
+
+        if trial_type == "coordinator":
+            wealth = accumulated_wealth.get_coordinator_wealth()
+        elif trial_type.startswith("forager"):
+            forager_id = trial_type.split("-")[1]
+            forager_id = int(forager_id)
+            wealth = accumulated_wealth.get_forager_wealth(forager_id)
+        else:
+            raise ValueError(f"Invalid trial type: {trial_type}. Expected one of {trial_types}.")
+
+        reward_text = f"The total number of coins collected on the previous iteration is {n_coins}.\n\n"
+        reward_text += f"Based on the existing contract, you received {wealth} coins.\n\n"
+        return reward_text

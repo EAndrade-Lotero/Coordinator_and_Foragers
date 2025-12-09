@@ -5,10 +5,10 @@ NUM_FORAGERS = 2
 POWER_ROLE = "coordinator"
 
 NUM_CENTROIDS = 2
-NUM_COINS = 100
+NUM_COINS = 3
 DISPERSION = 10
 
-INITIAL_WEALTH = 100
+INITIAL_WEALTH = 3
 LIST_OF_DISTRIBUTIONS = ["linear"]
 INITIAL_POSITIONS = ["A", "B"]
 
@@ -22,10 +22,9 @@ NUM_TRIALS_PER_PARTICIPANT = 2
 MAX_NODES_PER_CHAIN = 10
 
 IMAGE_PATHS = {
-    "img_url": "static/positioning.png",
-    "map_url": "static/map.png",
-    "coin_url": "static/coin.png",
-    "forager_url": "static/forager.png",
+    "map_url": "static/assets/images/map.png",
+    "coin_url": "static/assets/images/coin.png",
+    "forager_url": "static/assets/images/forager.png",
 }
 
 RNG = np.random.default_rng(42)

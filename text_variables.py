@@ -155,7 +155,7 @@ WELCOME_TEXT = f"""
 """
 
 ############################################################
-# Coordinator instructions
+# Coordinator texts
 
 COORDINATOR_INSTRUCTIONS = f"""
     {STYLE}
@@ -188,14 +188,48 @@ COORDINATOR_INSTRUCTIONS = f"""
     <br>
     <p>
     That’s it for instructions. Enjoy playing “The coordinator and foragers” game!
+    If you are ready to start the game, press the button 'Next'.
     </p>
 
 </body>
 </html>
 """
 
+INVESTMENT_INSTRUCTIONS = f"""
+    {STYLE}
+
+    <h1>Instructions for investing for information</h1>
+
+    <p>
+    You have to invest a percentage of your endowment to obtain information about the location of the resources.
+    The percentage you invest corresponds to the probability that each coin is shown in your map.
+    Move the slider to determine the percentage of your endowment that you want to invest. 
+    Once you are done, press the button 'Next'.
+    </p>
+    <br>
+
+</body>
+</html>
+"""
+
+POSITIONING_INSTRUCTIONS = f"""
+    {STYLE}
+
+    <h1>Positioning page</h1>
+
+    <p>
+    Assign each forager to a location to maximize the coins they can collectively forage. 
+    Simply drag each icon and drop it to the selected position on the map. 
+    Once you are done, press the button 'Next'.
+    </p>
+    <br>
+
+</body>
+</html>
+"""
+
 ############################################################
-# Coordinator instructions
+# Forager instructions
 
 FORAGER_INSTRUCTIONS = f"""
     {STYLE}

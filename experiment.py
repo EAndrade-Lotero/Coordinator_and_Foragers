@@ -49,8 +49,6 @@ def get_trial_maker():
                 "sliders": STARTING_SLIDERS,
                 # Default initial positions of foragers in the world
                 "positions": INITIAL_POSITIONS,
-                # Default empty assignment of foragers to positions
-                "assignments": dict(),
             }
         ) for distribution in LIST_OF_DISTRIBUTIONS
     ]
@@ -64,7 +62,7 @@ def get_trial_maker():
         # mixin params
         include_previous_iteration=True,
         rate_mode="rate",
-        target_selection_method="one",
+        target_selection_method="all",
         verbose=True,  # for the demo
         # trial_maker params
         id_="coordinator_and_foragers_trial_maker",
@@ -88,9 +86,9 @@ class Exp(psynet.experiment.Experiment):
     initial_recruitment_size = 1
 
     timeline = Timeline(
-        InfoPage(
-            Markup(WELCOME_TEXT),
-            time_estimate=5
-        ),
+        # InfoPage(
+        #     Markup(WELCOME_TEXT),
+        #     time_estimate=5
+        # ),
         get_trial_maker()
     )
