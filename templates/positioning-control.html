@@ -163,7 +163,7 @@
         psynet.stageResponse = function() {
 
               const icons = Array.from(document.querySelectorAll('.icon'));
-              const positions = {};
+              const positions = [];
               icons.forEach((el, idx) => {
                 const x = parseFloat(el.style.left) || 0;
                 const y = parseFloat(el.style.top)  || 0;

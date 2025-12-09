@@ -16,7 +16,9 @@ from psynet.utils import get_logger
 from .helper_classes import (
     World,
 )
-from .game_parameters import INITIAL_POSITIONS
+from .game_parameters import (
+    NUM_FORAGERS,
+)
 
 logger = get_logger()
 
@@ -31,7 +33,7 @@ logger = get_logger()
 
 class PositioningControl(Control):
     macro = "positioning_area"
-    external_template = "custom-controls.html"
+    external_template = "positioning-control.html"
 
     def __init__(
         self,
@@ -42,33 +44,56 @@ class PositioningControl(Control):
         super().__init__()
         # Create world
         logger.info(f"World parameters: {world}")
-        world = World(**world)
-        world.map_path = context["map_url"]
-        world.coin_path = context["coin_url"]
-        world.forager_path = context["forager_url"]
+        self.world = World(**world)
+        # world.map_path = context["map_url"]
+        # world.coin_path = context["coin_url"]
+        # world.forager_path = context["forager_url"]
+        # Check investment (used in probability of showing a coin)
         assert investment is not None
-        logger.info(f"Investment on my end is: {investment}")
-        # assert investment > 0
-        # map_numpy = world.render(
-        #     show=False,
-        #     coin_percentage=investment,
-        #     coin_zoom=1e-2
-        # )
-        map_numpy = np.array(World.generate_rgba_array(w=10, h=10))
-        logger.info(f"{map_numpy.shape=}")
-        self.map = map_numpy.tolist()
-        l = np.where(map_numpy != 255)
-        logger.info(f"Num of non-white arguments in RGBA array: {l[0].shape[0]}")
-        # assert l[0].shape[0] > 0, f"{investment=} {l=}"
+        self.map = world.generate_rgba_array()
         self.forager_url = context["forager_url"]
         self.map_url = context["map_url"]
-        self.num_foragers = world.num_foragers
+        self.num_foragers = NUM_FORAGERS
+
+    def format_answer(self, raw_answer, **kwargs):
+        try:
+            assert raw_answer is not None
+            assert isinstance(raw_answer, list)
+            positions_and_coins ={
+                'positions': raw_answer,
+                'coins': self.world.coin_positions()
+            }
+            return positions_and_coins
+        except (ValueError, AssertionError):
+            return f"INVALID_RESPONSE"
+
+###########################################
+
+class ForagingControl(Control):
+    macro = "foraging_area"
+    external_template = "foraging-control.html"
+
+    def __init__(
+        self,
+        world:Dict[str, float],
+        context:Dict[str, Path],
+    ) -> None:
+        super().__init__()
+        # Create world
+        logger.info(f"World parameters: {world}")
+        self.world = World(**world)
+        self.map = self.world.generate_terrain()
+        self.forager_url = context["forager_url"]
+        self.map_url = context["map_url"]
+        self.num_foragers = NUM_FORAGERS
 
     def format_answer(self, raw_answer, **kwargs):
         try:
             # assert raw_answer is not None
-            # assert isinstance(raw_answer, dict)
-            return INITIAL_POSITIONS
+            # assert isinstance(raw_answer, list)
+            # return raw_answer
+            logger.info(f"Coins foraged: {raw_answer}")
+            return raw_answer
         except (ValueError, AssertionError):
             return f"INVALID_RESPONSE"
 

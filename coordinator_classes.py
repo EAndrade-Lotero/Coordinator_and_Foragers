@@ -73,7 +73,7 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
             ),
             # Asks the coordinator to assign foragers to positions
             ModularPage(
-                "positions",
+                "positions_and_coins",
                 Prompt(Markup(POSITIONING_INSTRUCTIONS)),
                 PositioningControl(
                     world=participant.current_trial.definition["world_parameters"],

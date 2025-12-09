@@ -5,7 +5,10 @@
 ##########################################################################################
 import ast
 from markupsafe import Markup
-from typing import List, Union, Dict, Any
+from typing import (
+    List, Union, Dict,
+    Any, Tuple
+)
 
 from psynet.utils import get_logger
 from psynet.modular_page import (
@@ -17,6 +20,7 @@ from psynet.trial.create_and_rate import RateTrialMixin
 from psynet.trial.imitation_chain import ImitationChainTrial
 
 from .custom_node import CustomNode
+from .custom_front_end import ForagingControl
 from .game_parameters import NUM_FORAGERS
 from .text_variables import FORAGER_INSTRUCTIONS
 
@@ -52,41 +56,60 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                 ),
             ),
             ModularPage(
-                "rate_trial",
-                Prompt(text=f"You have been assigned to position: {self.get_trial_position(participant)}"),
-                PushButtonControl(
-                    choices=[1],
-                    labels=["Next"],
-                    arrange_vertically=False,
+                "coins_foraged",
+                Prompt(text=f"You have been assigned to position: {self.get_my_trial_position(participant)}"),
+                ForagingControl(
+                    world=participant.current_trial.definition["world_parameters"],
+                    context=self.context,
                 ),
             )
         ]
 
         return list_of_pages
 
-    def get_trial_position(self, participant):
+    def get_my_trial_position(self, participant):
         """
         Gets the position of the trial
         """
         positions = self.get_positions(participant)
         forager_id = self.get_forager_id(participant)
         position = positions[forager_id]
-        logger.info(f"Trial {forager_id} has position {position}")
+        logger.info(f"Forager {forager_id} has position {position}")
         return position
 
-    def get_positions(self, participant) -> List[int]:
+    def get_world_coins(self, participant) -> List[Tuple[int, int]]:
+        # Get positions and coins from coordinator
+        positions_and_coins = self.get_positions_and_coins(participant)
+        # Keep only coins
+        coins = positions_and_coins["coins"]
+        # Verify type of coins
+        if isinstance(coins, str):
+            try:
+                coins = ast.literal_eval(coins)
+            except Exception as e:
+                logger.error(f"Error parsing {coins}")
+                raise e
+        assert isinstance(coins, list), f"Error: expected list, got {type(coins)}"
+        logger.info(f"All coins in the world at the beginning: {coins}")
+        # Get the answers from other forager trials
+        other_foragers_answers = self.get_answers_from_role('forager', participant.current_trial.node)
+        # Subtract the coins gathered by each forager
+        for answer in other_foragers_answers:
+            other_forager_coins = answer["coins_foraged"]
+            if isinstance(other_forager_coins, str):
+                other_forager_coins = ast.literal_eval(other_forager_coins)
+            if len(other_forager_coins) > 0:
+                coins = [coin for coin in coins if coin not in other_forager_coins]
+        return coins
+
+    def get_positions(self, participant) -> List[Tuple[int, int]]:
         """
         Gets the positions of the foragers provided by the coordinator
         """
-        # Get current node
-        current_node = participant.current_trial.node
-        # Get answers.
-        coordinator_answers = self.get_answers_from_role('coordinator', current_node)
-        assert len(coordinator_answers) == 1, f"Error: Found more than one coordinator in node {current_node.id}"
-        coordinator_answers = coordinator_answers[0]
-        # Extract positions from answers
-        assert "positions" in coordinator_answers.keys(), f"Error: Found no positions in coordinator's answers: {coordinator_answers.keys()}"
-        positions = coordinator_answers["positions"]
+        # Get positions and coins from coordinator
+        positions_and_coins = self.get_positions_and_coins(participant)
+        # Keep positions
+        positions = positions_and_coins["positions"]
         # Verify type of positions
         if isinstance(positions, str):
             try:
@@ -97,6 +120,17 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         assert isinstance(positions, list), f"Error: expected list, got {type(positions)}"
         logger.info(f"Positions obtained {positions}")
         return positions
+
+    def get_positions_and_coins(self, participant) -> Dict[str, List[Tuple[int, int]]]:
+        # Get current node
+        current_node = participant.current_trial.node
+        # Get answers
+        coordinator_answers = self.get_answers_from_role('coordinator', current_node)
+        assert len(coordinator_answers) == 1, f"Error: Found more than one coordinator in node {current_node.id}"
+        coordinator_answers = coordinator_answers[0]
+        # Extract positions from answers
+        assert "positions_and_coins" in coordinator_answers.keys(), f"Error: Found no positions_and_coins in coordinator's answers: {coordinator_answers.keys()}"
+        return coordinator_answers["positions_and_coins"]
 
     def get_forager_id(self, participant) -> int:
         """
@@ -125,7 +159,7 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
             # Register forager id in working memory for the trial
             participant.current_trial.vars["forager_id"] = forager_id
 
-        logger.info(f"Trial {trial_id} was assigned to forager id {forager_id}")
+        logger.info(f"Trial {trial_id} was assigned to forager {forager_id}")
         return forager_id
 
     def get_answers_from_role(self, role:str, node:CustomNode) -> List[Dict[str, Any]]:

@@ -39,13 +39,14 @@ class World:
 
     Grid cells contain 1 if a coin is present, otherwise 0.
     """
-    width: Optional[int] = 4
-    height: Optional[int] = 3
+    width: Optional[int] = 50
+    height: Optional[int] = 50
     coin_path: Path = None
     map_path: Path = None
     forager_path = None
     num_foragers: int = NUM_FORAGERS
     _rng = RNG
+    max_percentage_of_coins = 1
 
     def __init__(
         self,
@@ -54,19 +55,27 @@ class World:
         distribution: str,
         dispersion: float,
     ) -> None:
-        self.num_coins = num_coins
-        self.num_centroids = num_centroids
-        assert(distribution in ["linear", "circular", "oval"]), f"Dispersion {distribution} not supported. Choose from ['linear', 'circular', 'oval']."
-        self.distribution = distribution
-        assert(dispersion > 0), f"Dispersion must be greater than 0 (but got {dispersion})."
-        self.dispersion = dispersion
+        logger.info(f"Initializing world...")
+        # Check width and height
         if self.width <= 0 or self.height <= 0:
             raise ValueError("width and height must be positive.")
-        if self.num_coins < 0:
-            raise ValueError("num_coins must be non-negative.")
-        if self.num_coins > self.width * self.height / 10:
-            raise ValueError(f"num_coins cannot exceed {int(self.width * self.height / 10)} (but got {self.num_coins})")
         self.grid = np.zeros((self.width, self.height))
+        logger.info(f"Grid of dimensions: {self.grid.shape} created...")
+        # Check number of coins
+        coin_percentage = num_coins / (self.width * self.height)
+        assert coin_percentage > 0, f"Error, number of coins should be greater than 0, bu got {num_coins}"
+        assert coin_percentage < self.max_percentage_of_coins, f"Error: percentage of coins in world should not be greater than {self.max_percentage_of_coins}, bu got {coin_percentage}"
+        logger.info(f"Percentage of map with coins: {coin_percentage}")
+        self.num_coins = num_coins
+        # Check centroids
+        self.num_centroids = num_centroids
+        # Check distribution
+        assert(distribution in ["linear", "circular", "oval"]), f"Dispersion {distribution} not supported. Choose from ['linear', 'circular', 'oval']."
+        self.distribution = distribution
+        # Check dispersion
+        assert(dispersion > 0), f"Dispersion must be greater than 0 (but got {dispersion})."
+        self.dispersion = dispersion
+        logger.info("Placing coins...")
         self._place_coins()
 
     def coin_positions(self) -> List[Tuple[int, int]]:
@@ -275,21 +284,35 @@ class World:
 
         return [tuple(row) for row in samples]
 
-    @staticmethod
-    def generate_rgba_array(w=10, h=10, b=180, a_even=255, a_odd=140):
+    def generate_rgba_array(self, b=180, a_even=255, a_odd=140):
         rgba = [
             [
                 [
-                    round(255 * x / (w - 1)),   # R
-                    round(255 * y / (h - 1)),   # G
+                    0,   # R
+                    0,   # G
                     b,                          # B
-                    a_even if (x + y) % 2 == 0 else a_odd  # A
+                    # a_even if (x + y) % 2 == 0 else a_odd  # A
+                    a_even if self.grid[x, y] == 1 else a_odd
                 ]
-                for x in range(w)
+                for x in range(self.width)
             ]
-            for y in range(h)
+            for y in range(self.height)
         ]
         return rgba
+
+    def generate_terrain(self) -> NDArray[np.int32]:
+        coords = self.coin_positions()
+        xs, ys = zip(*coords)
+        rows = np.array(ys)
+        cols = np.array(xs)
+        terrain = self._rng.integers(220, 255, size=(self.height, self.width))
+        terrain[rows, cols] = 0
+
+        # Check coin positions are 0
+        coin_checks = [terrain[y, x] == 0 for x, y in coords]
+        assert(np.all(coin_checks))
+
+        return terrain.tolist()
 
 class WealthTracker:
     """Keeps track of the coins throughout iterations"""
