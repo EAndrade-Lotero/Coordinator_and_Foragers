@@ -76,22 +76,22 @@
         /////////////////////////////////////////////////////
         // Draw the map from pixel data
         /////////////////////////////////////////////////////
-        const data = {{ config.map }};  // H x W x 3
+        const data = {{ config.map }};  // H x W
         const H = data.length;
         const W = data[0].length;
         const canvas = document.getElementById("mapImg");
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext("2d", { willReadFrequently: false });
         const imgData = ctx.createImageData(W, H);
         const buf = imgData.data;
 
         let idx = 0;
         for (let y = 0; y < H; y++) {
           for (let x = 0; x < W; x++) {
-            const [r, g, b, a] = data[y][x];
-            buf[idx++] = r;
-            buf[idx++] = g;
-            buf[idx++] = b;
-            buf[idx++] = a;
+            const v = data[y][x];
+            buf[idx++] = v;
+            buf[idx++] = v;
+            buf[idx++] = v;
+            buf[idx++] = 255;
           }
         }
         ctx.putImageData(imgData, 0, 0);
@@ -152,6 +152,21 @@
             active = null;
         }
 
+        function iconPixelToGrid(x, y, gridW = 15, gridH = 10) {
+          const cellW = canvas.width / W;
+          const cellH = canvas.height / H;
+
+          // Convert to grid indices
+          let col = Math.floor(x / cellW);
+          let row = Math.floor(y / cellH);
+
+          // Clamp to valid range (in case x,y fall slightly outside)
+          col = Math.max(0, Math.min(W - 1, col));
+          row = Math.max(0, Math.min(H - 1, row));
+
+          return [col, row];
+        }
+
         stage.addEventListener('pointerdown', onPointerDown);
         window.addEventListener('pointermove', onPointerMove);
         window.addEventListener('pointerup', onPointerUp);
@@ -167,21 +182,9 @@
               icons.forEach((el, idx) => {
                 const x = parseFloat(el.style.left) || 0;
                 const y = parseFloat(el.style.top)  || 0;
-                positions[idx] = [x, y];
+                positions[idx] = iconPixelToGrid(x, y);
               });
               psynet.response.staged.rawAnswer = positions;
-
-            {#const forager1 = document.getElementById('forager1-container');#}
-            {#const x1 = parseFloat(forager1.style.left);#}
-            {#const y1 = parseFloat(forager1.style.top);#}
-            {##}
-            {#const forager2 = document.getElementById('forager2-container');#}
-            {#const x2 = parseFloat(forager2.style.left);#}
-            {#const y2 = parseFloat(forager2.style.top);#}
-            {##}
-            {#psynet.response.staged.rawAnswer = {#}
-            {#    0: [x1, y1], #}
-            {#    1: [x2, y2]#}
         }
 
     </script>

@@ -18,10 +18,7 @@ from .game_parameters import (
     NUM_FORAGERS,
     INITIAL_POSITIONS,
     STARTING_SLIDERS,
-    NUM_CENTROIDS,
-    NUM_COINS,
-    DISPERSION,
-    LIST_OF_DISTRIBUTIONS,
+    WORLD_PATHS,
     IMAGE_PATHS,
 )
 
@@ -38,19 +35,14 @@ def get_trial_maker():
         CustomNode(
             context=IMAGE_PATHS,
             seed={
-                # Parameters of the world to be created
-                "world_parameters": {
-                    "num_coins": NUM_COINS,
-                    "num_centroids": NUM_CENTROIDS,
-                    "dispersion": DISPERSION,
-                    "distribution": distribution
-                },
+                # World with coins
+                "world_path": world_path,
                 # Settings of the social contract
                 "sliders": STARTING_SLIDERS,
                 # Default initial positions of foragers in the world
                 "positions": INITIAL_POSITIONS,
             }
-        ) for distribution in LIST_OF_DISTRIBUTIONS
+        ) for world_path in WORLD_PATHS
     ]
 
     return CreateAndRateTrialMaker(

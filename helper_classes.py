@@ -1,5 +1,6 @@
 # Helper classes to be used in the experiment
 import PIL
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -21,6 +22,11 @@ logger = get_logger()
 try:
     # Assume running from psynet
     from .game_parameters import (
+        WORLD_WIDTH,
+        WORLD_HEIGHT,
+        NUM_COINS,
+        NUM_CENTROIDS,
+        DISPERSION,
         NUM_FORAGERS,
         INITIAL_WEALTH,
         RNG,
@@ -28,6 +34,11 @@ try:
 except:
     # If not, try normal import
     from game_parameters import (
+        WORLD_WIDTH,
+        WORLD_HEIGHT,
+        NUM_COINS,
+        NUM_CENTROIDS,
+        DISPERSION,
         NUM_FORAGERS,
         INITIAL_WEALTH,
         RNG,
@@ -39,8 +50,8 @@ class World:
 
     Grid cells contain 1 if a coin is present, otherwise 0.
     """
-    width: Optional[int] = 50
-    height: Optional[int] = 50
+    width: Optional[int] = WORLD_WIDTH
+    height: Optional[int] = WORLD_HEIGHT
     coin_path: Path = None
     map_path: Path = None
     forager_path = None
@@ -78,11 +89,40 @@ class World:
         logger.info("Placing coins...")
         self._place_coins()
 
+    @staticmethod
+    def generate_from_json(path: Path) -> "World":
+        with open(path, "r") as f:
+            coins = json.load(f)
+        world = World.generate_from_coins(coins)
+        world.map_path = path
+        return world
+
+    @staticmethod
+    def generate_from_coins(
+        coins: List[Tuple[int, int]],
+    ) -> "World":
+        world_parameters = {
+            "num_coins": NUM_COINS,
+            "num_centroids": NUM_CENTROIDS,
+            "dispersion": DISPERSION,
+            "distribution": "linear"
+        }
+        world = World(**world_parameters)
+        world.clear()
+        xs, ys = zip(*coins)
+        rows = np.array(ys)
+        cols = np.array(xs)
+        world.grid[rows, cols] = 1
+        return world
+
     def coin_positions(self) -> List[Tuple[int, int]]:
         """List of (row, col) positions where coins are present."""
-        coords_x, coords_y = np.where(self.grid == 1)
-        coin_positions = list(zip(coords_x.tolist(), coords_y.tolist()))
+        rc = np.argwhere(self.grid == 1)  # (row, col)
+        coin_positions = [(int(c), int(r)) for r, c in rc]  # (x, y)
         return coin_positions
+
+    def save_world(self) -> None:
+        json.dump(self.coin_positions(), open(self.map_path, "w"))
 
     def count_coins(self) -> int:
         """Return the number of coins currently placed."""
@@ -114,7 +154,7 @@ class World:
             )
             coords_x = [int(x) for x, y in sample_coins]
             coords_y = [int(y) for x, y in sample_coins]
-            self.grid[coords_x, coords_y] = 1
+            self.grid[coords_y, coords_x] = 1
 
     def get_centroids(self) -> List[Tuple[int, int]]:
         """Return the centroids of coins placed."""
@@ -285,20 +325,13 @@ class World:
         return [tuple(row) for row in samples]
 
     def generate_rgba_array(self, b=180, a_even=255, a_odd=140):
-        rgba = [
-            [
-                [
-                    0,   # R
-                    0,   # G
-                    b,                          # B
-                    # a_even if (x + y) % 2 == 0 else a_odd  # A
-                    a_even if self.grid[x, y] == 1 else a_odd
-                ]
-                for x in range(self.width)
-            ]
-            for y in range(self.height)
-        ]
-        return rgba
+        coords = self.coin_positions()
+        xs, ys = zip(*coords)
+        rows = np.array(ys)
+        cols = np.array(xs)
+        terrain = np.ones((self.height, self.width)) * a_odd
+        terrain[rows, cols] = a_even
+        return terrain.tolist()
 
     def generate_terrain(self) -> NDArray[np.int32]:
         coords = self.coin_positions()
@@ -313,6 +346,7 @@ class World:
         assert(np.all(coin_checks))
 
         return terrain.tolist()
+
 
 class WealthTracker:
     """Keeps track of the coins throughout iterations"""

@@ -59,7 +59,8 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                 "coins_foraged",
                 Prompt(text=f"You have been assigned to position: {self.get_my_trial_position(participant)}"),
                 ForagingControl(
-                    world=participant.current_trial.definition["world_parameters"],
+                    position=self.get_my_trial_position(participant),
+                    coins=self.get_world_coins(participant),
                     context=self.context,
                 ),
             )
@@ -76,31 +77,6 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         position = positions[forager_id]
         logger.info(f"Forager {forager_id} has position {position}")
         return position
-
-    def get_world_coins(self, participant) -> List[Tuple[int, int]]:
-        # Get positions and coins from coordinator
-        positions_and_coins = self.get_positions_and_coins(participant)
-        # Keep only coins
-        coins = positions_and_coins["coins"]
-        # Verify type of coins
-        if isinstance(coins, str):
-            try:
-                coins = ast.literal_eval(coins)
-            except Exception as e:
-                logger.error(f"Error parsing {coins}")
-                raise e
-        assert isinstance(coins, list), f"Error: expected list, got {type(coins)}"
-        logger.info(f"All coins in the world at the beginning: {coins}")
-        # Get the answers from other forager trials
-        other_foragers_answers = self.get_answers_from_role('forager', participant.current_trial.node)
-        # Subtract the coins gathered by each forager
-        for answer in other_foragers_answers:
-            other_forager_coins = answer["coins_foraged"]
-            if isinstance(other_forager_coins, str):
-                other_forager_coins = ast.literal_eval(other_forager_coins)
-            if len(other_forager_coins) > 0:
-                coins = [coin for coin in coins if coin not in other_forager_coins]
-        return coins
 
     def get_positions(self, participant) -> List[Tuple[int, int]]:
         """
@@ -153,7 +129,8 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
             taken_ids = [int(idx) for idx in taken_ids]
             # Get a list of available ids
             available_ids = [idx for idx in range(NUM_FORAGERS) if idx not in taken_ids]
-            assert(len(available_ids) > 0), f"Error: Attempt to assign forager (trial:{trial_id}) in node (node:{participant.current_trial.node.id})."
+            assert (
+                        len(available_ids) > 0), f"Error: Attempt to assign forager (trial:{trial_id}) in node (node:{participant.current_trial.node.id})."
             # Get the first available id as a forager_id
             forager_id = available_ids[0]
             # Register forager id in working memory for the trial
@@ -162,7 +139,7 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         logger.info(f"Trial {trial_id} was assigned to forager {forager_id}")
         return forager_id
 
-    def get_answers_from_role(self, role:str, node:CustomNode) -> List[Dict[str, Any]]:
+    def get_answers_from_role(self, role: str, node: CustomNode) -> List[Dict[str, Any]]:
         """Gets the answers from the trial or trials of the given rol"""
         """
         Gets the positions of the foragers provided by the coordinator
@@ -172,9 +149,9 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         trials_with_role_in_node = [
             trial for trial in node.all_trials
             if (
-                trial.finalized == True
-                and trial.failed == False
-                and role in str(trial).lower()
+                    trial.finalized == True
+                    and trial.failed == False
+                    and role in str(trial).lower()
             )
         ]
         logger.info(f"Found {len(trials_with_role_in_node)} trials with {role} role in node {node.id}")
@@ -184,13 +161,44 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         list_of_answers = [self.get_answers_from_trial(trial) for trial in trials_with_role_in_node]
         return list_of_answers
 
-    def get_answers_from_trial(self, trial:ImitationChainTrial) -> Dict[str, Any]:
+    def get_answers_from_trial(self, trial: ImitationChainTrial) -> Dict[str, Any]:
         """Extract the answers from the given trial"""
         assert isinstance(trial, ImitationChainTrial), f"Error: expected ImitationChainTrial, got {type(trial)}"
         # Extract the answer
         answer = self.get_target_answer(trial)
         assert isinstance(answer, dict), f"Error: expected dict, got {type(answer)} --- {answer=}"
         return answer
+
+    def get_world_coins(self, participant) -> List[Tuple[int, int]]:
+        coins = self.get_initial_coins(participant)
+        # Get the answers from other forager trials
+        other_foragers_answers = self.get_answers_from_role('forager', participant.current_trial.node)
+        # Subtract the coins gathered by each forager
+        for answer in other_foragers_answers:
+            other_forager_coins = [tuple(coin) for coin in answer["coins_foraged"]]
+            logger.info(f"Other forager collected coins: {other_forager_coins}")
+            if isinstance(other_forager_coins, str):
+                other_forager_coins = ast.literal_eval(other_forager_coins)
+            if len(other_forager_coins) > 0:
+                coins = [(coin) for coin in coins if coin not in other_forager_coins]
+        logger.info(f"Remaining coins: {coins}")
+        return coins
+
+    def get_initial_coins(self, participant) -> List[Tuple[int, int]]:
+        # Get positions and coins from coordinator
+        positions_and_coins = self.get_positions_and_coins(participant)
+        # Keep only coins
+        coins = positions_and_coins["coins"]
+        # Verify type of coins
+        if isinstance(coins, str):
+            try:
+                coins = ast.literal_eval(coins)
+            except Exception as e:
+                logger.error(f"Error parsing {coins}")
+                raise e
+        assert isinstance(coins, list), f"Error: expected list, got {type(coins)}"
+        logger.info(f"All coins in the world at the beginning: {coins}")
+        return coins
 
     def format_answer(self, raw_answer, **kwargs) -> Union[float, str]:
         try:

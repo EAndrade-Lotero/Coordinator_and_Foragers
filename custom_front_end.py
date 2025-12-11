@@ -3,10 +3,8 @@
 ##########################################################################################
 # Imports
 ##########################################################################################
-import numpy as np
-
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Union, List, Tuple
 
 from psynet.modular_page import (
     Control,
@@ -37,23 +35,24 @@ class PositioningControl(Control):
 
     def __init__(
         self,
-        world:Dict[str, float],
+        world_path:str,
         context:Dict[str, Path],
         investment:float,
     ) -> None:
         super().__init__()
         # Create world
-        logger.info(f"World parameters: {world}")
-        self.world = World(**world)
-        # world.map_path = context["map_url"]
-        # world.coin_path = context["coin_url"]
-        # world.forager_path = context["forager_url"]
+        self.world = World.generate_from_json(Path(world_path))
+        logger.info(f"Coins created at: {self.world.coin_positions()}")
         # Check investment (used in probability of showing a coin)
         assert investment is not None
-        self.map = world.generate_rgba_array()
+        # Generate attributes
+        logger.info(f"Trying rgb generation...")
+        self.map = self.world.generate_rgba_array()
+        logger.info(f"Generated!")
         self.forager_url = context["forager_url"]
-        self.map_url = context["map_url"]
+        self.map_url = self.world.map_path
         self.num_foragers = NUM_FORAGERS
+        logger.info("World created successfully!")
 
     def format_answer(self, raw_answer, **kwargs):
         try:
@@ -63,6 +62,8 @@ class PositioningControl(Control):
                 'positions': raw_answer,
                 'coins': self.world.coin_positions()
             }
+            logger.info(f"Coordinator decided positions: {positions_and_coins['positions']}")
+            logger.info(f"World contains coins in: {positions_and_coins['coins']}")
             return positions_and_coins
         except (ValueError, AssertionError):
             return f"INVALID_RESPONSE"
@@ -75,16 +76,19 @@ class ForagingControl(Control):
 
     def __init__(
         self,
-        world:Dict[str, float],
+        position: Tuple[int, int],
+        coins: List[Tuple[int, int]],
         context:Dict[str, Path],
     ) -> None:
         super().__init__()
-        # Create world
-        logger.info(f"World parameters: {world}")
-        self.world = World(**world)
+        self.pos_x = position[0]
+        self.pos_y = position[1]
+        # Create world from json
+        self.world = World.generate_from_coins(coins)
+        logger.info(f"Coins in world: {self.world.coin_positions()}")
         self.map = self.world.generate_terrain()
         self.forager_url = context["forager_url"]
-        self.map_url = context["map_url"]
+        self.map_url = self.world.map_path
         self.num_foragers = NUM_FORAGERS
 
     def format_answer(self, raw_answer, **kwargs):

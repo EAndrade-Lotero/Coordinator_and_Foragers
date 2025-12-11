@@ -124,8 +124,8 @@
         // Config
         // ----------------------------
         let world = {{ config.map }};
-        const WORLD_W = world.length;
-        const WORLD_H = world[0].length;
+        const WORLD_H = world.length;
+        const WORLD_W = world[0].length;
         const VIEW_SIZE = 11;            // 11x11
         const HALF = Math.floor(VIEW_SIZE / 2); // 5
         const CELL_SIZE = parseInt(getComputedStyle(document.documentElement)
@@ -148,8 +148,8 @@
         // View center position (x, y)
         // Start roughly in the middle
         // ----------------------------
-        let x = Math.floor(WORLD_W / 2);
-        let y = Math.floor(WORLD_H / 2);
+        let x = {{ config.pos_x }};
+        let y = {{ config.pos_y }};
         let coins_foraged = [];
 
         // ----------------------------
