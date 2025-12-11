@@ -29,15 +29,9 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
         # Get new sliders settings
         coordinator = self.get_coordinator(trials)
         overhead = coordinator.answer["overhead"]
-        wages = coordinator.answer["wages"]
-        prerogative = coordinator.answer["prerogative"]
 
         # Beget new setting
-        seed["sliders"] = {
-            "overhead": overhead,
-            "wages": wages,
-            "prerogative": prerogative,
-        }
+        seed["overhead"] = overhead,
         return seed
 
     def get_coordinator(self, trials):
