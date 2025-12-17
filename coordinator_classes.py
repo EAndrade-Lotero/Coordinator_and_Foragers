@@ -106,6 +106,7 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 dimension="prerogative",
                 start_value=self.get_slider_value(participant, "prerogative"),
                 time_estimate=self.time_estimate,
+                n_steps=3,
             ),
         ]
 

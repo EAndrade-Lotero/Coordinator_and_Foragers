@@ -47,7 +47,7 @@ class PositioningControl(Control):
         assert investment is not None
         # Generate attributes
         logger.info(f"Trying rgb generation...")
-        self.map = self.world.generate_rgba_array()
+        self.map = self.world.coordinator_view(investment)
         logger.info(f"Generated!")
         self.forager_url = context["forager_url"]
         self.map_url = self.world.map_path
@@ -78,6 +78,7 @@ class ForagingControl(Control):
         self,
         position: Tuple[int, int],
         coins: List[Tuple[int, int]],
+        max_gear: int,
         context:Dict[str, Path],
     ) -> None:
         super().__init__()
@@ -90,6 +91,9 @@ class ForagingControl(Control):
         self.forager_url = context["forager_url"]
         self.map_url = self.world.map_path
         self.num_foragers = NUM_FORAGERS
+        assert 0 <= max_gear <=2 and isinstance(max_gear, int)
+        self.max_gear = max_gear
+        self.enabled = ['true' if i <= max_gear else 'false' for i in range(3)]
 
     def format_answer(self, raw_answer, **kwargs):
         try:

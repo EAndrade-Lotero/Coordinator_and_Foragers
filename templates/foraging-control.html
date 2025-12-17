@@ -1,255 +1,298 @@
 {% macro foraging_area(config) %}
 
   <style>
-    :root{
-      --cell-size: 28px; /* how big each of the 11x11 cells appears */
-      --grid: 11;
-      --canvas-size: calc(var(--cell-size) * var(--grid));
-    }
-
-    body{
-      margin: 0;
-      min-height: 100svh;
-      display: grid;
-      place-items: center;
-      background: #0f1115;
-      color: #e8ecf1;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    }
-
-    .panel{
-      display: grid;
-      gap: 14px;
-      justify-items: center;
-      padding: 18px 22px;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 14px;
-      background: rgba(255,255,255,0.04);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-      backdrop-filter: blur(6px);
-    }
-
-    .viewport{
-      position: relative;
-      width: var(--canvas-size);
-      height: var(--canvas-size);
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: #11151c;
-    }
-
-    canvas{
-      width: 100%;
+    :root { --bg:#0b0f14; --panel:#111826; --text:#e6edf3; --muted:#93a4b5; }
+    html, body { height: 85%; margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    .wrap {
       height: 100%;
-      display: block;
-      image-rendering: pixelated; /* crisp blocky look */
-    }
-
-    /* Center star overlay */
-    .star{
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        width: 42px;
-        height: 42px;
-        display: grid;
-        place-items: center;
-        border-radius: 999px;
-        {#background: rgba(255,255,255,0.08);#}
-        background-image: url("{{ config.forager_url }}");
-        background-size: cover;
-        border: 1px solid rgba(255,255,255,0.18);
-        box-shadow:
-        0 0 0 6px rgba(255,255,255,0.04),
-        0 10px 25px rgba(0,0,0,0.4);
-        pointer-events: none; /* don't steal clicks/keys */
-    }
-
-    .star span{
-      font-size: 22px;
-      line-height: 1;
-      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
-    }
-
-    .hud{
-      display: flex;
-      gap: 10px;
+      display: grid;
+      grid-template-columns: auto 240px;
+      gap: 16px;
       align-items: center;
-      font-size: 13px;
-      opacity: 0.9;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
     }
+    canvas {
+      background: #000;
+      border-radius: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .title { display:flex; align-items:center; gap:10px; font-weight: 700; letter-spacing:.2px; margin-bottom: 10px; }
+    .hint { color: var(--muted); font-size: 13px; line-height: 1.35; margin: 10px 0 14px; }
+    .gearBox {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .track {
+      width: 10px;
+      height: 120px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      position: relative;
+      margin: 0 auto;
+    }
+    .thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.9);
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 6px 16px rgba(0,0,0,.35);
+    }
+    .gears { display: grid; gap: 10px; font-size: 14px; }
+    .g {
+      display:flex; justify-content: space-between; align-items:center;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.06);
+      background: rgba(255,255,255,.02);
+    }
+    .badge { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .row { margin-top: 14px; font-size: 13px; color: var(--muted); }
+    .kbd { display:inline-block; padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: var(--text); font-size: 12px; }
+    .g.disabled {
+      opacity: 0.35;
+      filter: grayscale(1);
+      cursor: not-allowed;
+    }
+    .g.disabled .badge { color: rgba(147,164,181,0.7); }
+    .scene { display: flex; align-items: center; gap: 14px; }
 
-    .badge{
-      padding: 4px 8px;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
-      font-variant-numeric: tabular-nums;
+    .fuel { width: 72px; display: grid; gap: 8px; justify-items: center; }
+    .fuelFrame {
+      width: 22px;
+      height: 440px;          /* match canvas CSS height */
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+      position: relative;
+      overflow: hidden;
     }
-
-    .hint{
-      opacity: 0.75;
-      font-size: 12px;
-      text-align: center;
-      max-width: 38ch;
+    .fuelFill {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 100%;
+      background: #f2dd83; /* keep it simple; you can color later */
     }
+    .fuelLabel { font-size: 12px; color: var(--muted); text-align: center; }
   </style>
-</head>
-<body>
-  <div class="panel">
-    <div class="viewport" id="viewport">
-      <canvas id="view"></canvas>
-      <div class="star" aria-hidden="true"></div>
+    <body>
+  <div class="wrap">
+    <div class="scene">
+      <div class="fuel" aria-label="Fuel gauge">
+        <div class="fuelFrame">
+          <div id="fuelFill" class="fuelFill"></div>
+        </div>
+        <div id="fuelLabel" class="fuelLabel">Fuel: 100%</div>
+      </div>
+
+      <canvas id="cv" width="440" height="440"></canvas>
     </div>
 
-    <div class="hud">
-      <div class="badge">World: 50×50</div>
-      <div class="badge">View: 11×11</div>
-      <div class="badge">Cell size: <span id="cellSizeLabel"></span> px</div>
-    </div>
+    <aside class="panel">
+      <div class="title">Movement Info</div>
+      <div class="hint">
+        Move with <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span>.
+          <br>
+        Change gear with <span class="kbd">↑</span> / <span class="kbd">↓</span>.
+      </div>
 
-    <div class="hud">
-      <div class="badge">Center (x, y): <span id="posLabel"></span></div>
-    </div>
+      <div class="gearBox">
+        <div class="track" aria-hidden="true">
+          <div id="thumb" class="thumb"></div>
+        </div>
+        <div class="gears">
+          <div id="g1" class="g"><span>Gear 3 (fast)</span><span class="badge" id="b1"></span></div>
+          <div id="g2" class="g"><span>Gear 2</span><span class="badge" id="b2"></span></div>
+          <div id="g3" class="g"><span>Gear 1 (slow)</span><span class="badge" id="b3"></span></div>
+        </div>
+      </div>
 
-    <div class="hint">
-      Use arrow keys to move inside the terrain. Coins appear as a black square.
-    </div>
+      <div class="row" id="pos"></div>
+    </aside>
   </div>
 
   <script>
-        // ----------------------------
-        // Config
-        // ----------------------------
+        let fuel = 100;          // 0..100
+        const fuelFill = document.getElementById("fuelFill");
+        const fuelLabel = document.getElementById("fuelLabel");
+
         let world = {{ config.map }};
         const WORLD_H = world.length;
         const WORLD_W = world[0].length;
-        const VIEW_SIZE = 11;            // 11x11
-        const HALF = Math.floor(VIEW_SIZE / 2); // 5
-        const CELL_SIZE = parseInt(getComputedStyle(document.documentElement)
-          .getPropertyValue('--cell-size'), 10);
+        const VIEW = 11;
+        const CENTER = Math.floor(VIEW / 2); // 5
 
-        // Canvas is drawn at native pixel resolution:
-        const canvas = document.getElementById('view');
-        const ctx = canvas.getContext('2d', { willReadFrequently: false });
+        const canvas = document.getElementById("cv");
+        const ctx = canvas.getContext("2d");
 
-        // Set internal canvas size so each cell is CELL_SIZE pixels.
-        canvas.width  = VIEW_SIZE * CELL_SIZE;
-        canvas.height = VIEW_SIZE * CELL_SIZE;
+        // HiDPI crispness
+        const cssSize = 440;
+        const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+        canvas.style.width = cssSize + "px";
+        canvas.style.height = cssSize + "px";
+        canvas.width = Math.floor(cssSize * dpr);
+        canvas.height = Math.floor(cssSize * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        // HUD elements
-        const posLabel = document.getElementById('posLabel');
-        const cellSizeLabel = document.getElementById('cellSizeLabel');
-        cellSizeLabel.textContent = CELL_SIZE.toString();
+        const cell = cssSize / VIEW;
 
-        // ----------------------------
-        // View center position (x, y)
-        // Start roughly in the middle
-        // ----------------------------
-        let x = {{ config.pos_x }};
-        let y = {{ config.pos_y }};
+        // Agent position in world coords
+        let ax = {{ config.pos_x }};
+        let ay = {{ config.pos_y }};
         let coins_foraged = [];
 
-        // ----------------------------
-        // Helper: safe read with clamp
-        // If outside world bounds, clamp to edge.
-        // (Alternative: return 0 or wrap-around.)
-        // ----------------------------
-        function getWorldValue(px, py) {
-          const cx = Math.max(0, Math.min(WORLD_W - 1, px));
-          const cy = Math.max(0, Math.min(WORLD_H - 1, py));
-          return world[cy][cx];
+        // Gear = number of tiles moved per keypress
+        let max_gear = {{ config.max_gear }};
+        const gears = [
+          { name: "Gear 1", tiles: 1, enabled: {{ config.enabled[2] }}  },
+          { name: "Gear 2", tiles: 2, enabled: {{ config.enabled[1] }} },
+          { name: "Gear 3", tiles: 4, enabled: {{ config.enabled[0] }}  }
+        ];
+        let gearIdx = 0;
+
+        const thumb = document.getElementById("thumb");
+        const gEls = [document.getElementById("g1"), document.getElementById("g2"), document.getElementById("g3")];
+        const bEls = [document.getElementById("b1"), document.getElementById("b2"), document.getElementById("b3")];
+        const posEl = document.getElementById("pos");
+
+        function updateGearUI() {
+            gEls.forEach((el, i) => {
+                el.classList.toggle("active", i === gearIdx);
+                el.classList.toggle("disabled", !gears[i].enabled);
+            });
+
+            bEls[2].textContent = `${gears[0].tiles} tile/press`;
+            bEls[1].textContent = `${gears[1].tiles} tiles/press`;
+            bEls[0].textContent = `${gears[2].tiles} tiles/press`;
+
+            // thumb: 1 bottom, 3 top
+            const yMap = [102, 51, 0];
+            thumb.style.top = yMap[gearIdx] + "px";
         }
 
-        // ----------------------------
-        // Render the 11x11 view centered at (x, y)
-        // We'll paint as rectangles per cell for clarity.
-        // ----------------------------
         function render() {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, cssSize, cssSize);
 
-          for (let j = 0; j < VIEW_SIZE; j++) {
-              for (let i = 0; i < VIEW_SIZE; i++) {
-                  const worldX = x + (i - HALF);
-                  const worldY = y + (j - HALF);
-                  const v = getWorldValue(worldX, worldY);
+            for (let vy = 0; vy < VIEW; vy++) {
+              for (let vx = 0; vx < VIEW; vx++) {
+                const wx = ax + (vx - CENTER);
+                const wy = ay + (vy - CENTER);
 
-                  // grayscale color
-                  ctx.fillStyle = `rgb(${v}, ${v}, ${v})`;
-                  ctx.fillRect(i * CELL_SIZE, j * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                let col = "#0a0d12";
+                if (wx >= 0 && wx < WORLD_W && wy >= 0 && wy < WORLD_H) {
+                    const v = world[wy][wx];
+                    col = `rgb(${v}, ${v}, ${v})`;
+                }
+
+                const px = vx * cell;
+                const py = vy * cell;
+
+                ctx.fillStyle = col;
+                ctx.fillRect(px, py, cell, cell);
+
+                ctx.strokeStyle = "rgba(255,255,255,0.08)";
+                ctx.strokeRect(px + 0.5, py + 0.5, cell - 1, cell - 1);
               }
-          }
-
-          // subtle grid lines
-          ctx.strokeStyle = "rgba(255,255,255,0.06)";
-          ctx.lineWidth = 1;
-          for (let i = 0; i <= VIEW_SIZE; i++) {
-            const px = i * CELL_SIZE;
-            ctx.beginPath();
-            ctx.moveTo(px, 0);
-            ctx.lineTo(px, canvas.height);
-            ctx.stroke();
-          }
-          for (let j = 0; j <= VIEW_SIZE; j++) {
-            const py = j * CELL_SIZE;
-            ctx.beginPath();
-            ctx.moveTo(0, py);
-            ctx.lineTo(canvas.width, py);
-            ctx.stroke();
-          }
-
-          posLabel.textContent = `(${x}, ${y})`;
-        }
-
-        // ----------------------------
-        // Movement logic
-        // Arrow keys update (x, y),
-        // NOT the star icon.
-        // ----------------------------
-        function move(dx, dy) {
-            x = Math.max(0, Math.min(WORLD_W - 1, x + dx));
-            y = Math.max(0, Math.min(WORLD_H - 1, y + dy));
-
-            // Check if there is a coin to be foraged
-            if (world[y][x] === 0) {
-                coins_foraged.push([x, y]);
-                {#world[y][x] = Math.floor(Math.random() * 35) + 220;#}
-                world[y][x] = 240;
-                console.log('Coin collected at position:', x, y);
             }
 
+            // Draw centered agent (fixed on screen)
+            const cx = (CENTER + 0.5) * cell;
+            const cy = (CENTER + 0.5) * cell;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, cell * 0.22, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(255,255,255,0.95)";
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(cx - cell * 0.35, cy);
+            ctx.lineTo(cx + cell * 0.35, cy);
+            ctx.moveTo(cx, cy - cell * 0.35);
+            ctx.lineTo(cx, cy + cell * 0.35);
+            ctx.strokeStyle = "rgba(0,0,0,0.55)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            posEl.textContent = `World position: (${ax}, ${ay}) • Gear: ${gearIdx + 1}`;
+
+            // Draw fuel gauge
+            fuelFill.style.height = `${fuel}%`;
+            fuelLabel.textContent = `Fuel: ${fuel}%`;
+        }
+
+        function move(dx, dy) {
+            if (fuel <= 0) return;
+
+            const k = gears[gearIdx].tiles;
+
+            // no diagonals: if both set, prefer vertical
+            if (dx !== 0 && dy !== 0) dx = 0;
+
+            ax = Math.max(0, Math.min(WORLD_W - 1, ax + dx * k));
+            ay = Math.max(0, Math.min(WORLD_H - 1, ay + dy * k));
+
+            // Check if there is a coin to be foraged
+            if (world[ay][ax] === 0) {
+                // Check if velocity is 1
+                if (gearIdx === 0) {
+                    coins_foraged.push([ax, ay]);
+                    world[ay][ax] = 240;
+                    console.log('Coin collected at position:', ax, ay);
+                } else {
+                    console.log('Moving too fast to collect coin!');
+                }
+            }
             console.log('Coins foraged so far:', coins_foraged);
 
             // Render world
             render();
+
+            // Decrement fuel
+            {#fuel = Math.max(0, fuel - gears[gearIdx].tiles);   // cost = tiles moved#}
+            fuel = Math.max(0, fuel - 1);
         }
 
-        window.addEventListener('keydown', (e) => {
-          const key = e.key;
+        window.addEventListener("keydown", (e) => {
+        // prevent page scroll with arrows / space
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
 
-          // Prevent page scrolling on arrow keys
-          if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(key)) {
-            e.preventDefault();
-          } else {
-            return;
-          }
+        const k = e.key.toLowerCase();
 
-          switch (key) {
-            case "ArrowUp":    move(0, -1); break;
-            case "ArrowDown":  move(0,  1); break;
-            case "ArrowLeft":  move(-1, 0); break;
-            case "ArrowRight": move(1,  0); break;
-          }
+        if (k === "w") move(0, -1);
+        else if (k === "s") move(0, 1);
+        else if (k === "a") move(-1, 0);
+        else if (k === "d") move(1, 0);
+        else if (e.key === "ArrowUp") {
+            if (gearIdx >= max_gear) return;
+            gearIdx = Math.min(2, gearIdx + 1);
+            updateGearUI();
+            render();
+        } else if (e.key === "ArrowDown") {
+          gearIdx = Math.min(max_gear, Math.max(0, gearIdx - 1));
+          updateGearUI();
+          render();
+        }
         }, { passive: false });
 
-        // Focus hint: click viewport to "mentally" anchor controls
-        document.getElementById('viewport').addEventListener('click', () => {
-          // no-op; just gives a natural interaction spot
-        });
-
-        // Initial draw
+        updateGearUI();
         render();
 
 

@@ -61,6 +61,7 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                 ForagingControl(
                     position=self.get_my_trial_position(participant),
                     coins=self.get_world_coins(participant),
+                    max_gear=self.get_max_gear(participant),
                     context=self.context,
                 ),
             )
@@ -98,15 +99,20 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         return positions
 
     def get_positions_and_coins(self, participant) -> Dict[str, List[Tuple[int, int]]]:
+        # Get answers
+        coordinator_answers = self.get_answer_from_coordinator(participant)
+        # Extract positions from answers
+        assert "positions_and_coins" in coordinator_answers.keys(), f"Error: Found no positions_and_coins in coordinator's answers: {coordinator_answers.keys()}"
+        return coordinator_answers["positions_and_coins"]
+
+    def get_answer_from_coordinator(self, participant) -> Dict[str, Any]:
         # Get current node
         current_node = participant.current_trial.node
         # Get answers
         coordinator_answers = self.get_answers_from_role('coordinator', current_node)
         assert len(coordinator_answers) == 1, f"Error: Found more than one coordinator in node {current_node.id}"
         coordinator_answers = coordinator_answers[0]
-        # Extract positions from answers
-        assert "positions_and_coins" in coordinator_answers.keys(), f"Error: Found no positions_and_coins in coordinator's answers: {coordinator_answers.keys()}"
-        return coordinator_answers["positions_and_coins"]
+        return coordinator_answers
 
     def get_forager_id(self, participant) -> int:
         """
@@ -199,6 +205,15 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         assert isinstance(coins, list), f"Error: expected list, got {type(coins)}"
         logger.info(f"All coins in the world at the beginning: {coins}")
         return coins
+
+    def get_max_gear(self, participant) -> int:
+        coordinator_answers = self.get_answer_from_coordinator(participant)
+        prerogative = coordinator_answers["prerogative"]
+        if isinstance(prerogative, str):
+            prerogative = ast.literal_eval(prerogative)
+        assert isinstance(prerogative, float), f"Error: expected float, got {type(max_gear)}"
+        max_gear = int(prerogative * 2)
+        return max_gear
 
     def format_answer(self, raw_answer, **kwargs) -> Union[float, str]:
         try:

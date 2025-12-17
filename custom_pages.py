@@ -2,7 +2,7 @@
 ##########################################################################################
 # Imports
 ##########################################################################################
-from typing import Union
+from typing import Union, Optional
 
 from psynet.utils import get_logger
 from psynet.timeline import FailedValidation
@@ -25,6 +25,7 @@ class SliderSettingPage(ModularPage):
             dimension: str,
             start_value: float,
             time_estimate: float,
+            n_steps: Optional[int] = 100,
     ) -> None:
         assert(dimension in ["overhead", "wages", "prerogative"]), f"Invalid dimension: {dimension}. Expected 'overhead', 'wages' or 'prerogative'"
 
@@ -45,7 +46,7 @@ class SliderSettingPage(ModularPage):
                 start_value=start_value,
                 min_value=0,
                 max_value=1,
-                n_steps=100,
+                n_steps=n_steps,
             ),
             time_estimate=time_estimate,
             save_answer=dimension

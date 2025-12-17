@@ -87,7 +87,7 @@ class World:
         assert(dispersion > 0), f"Dispersion must be greater than 0 (but got {dispersion})."
         self.dispersion = dispersion
         logger.info("Placing coins...")
-        self._place_coins()
+        # self._place_coins()
 
     @staticmethod
     def generate_from_json(path: Path) -> "World":
@@ -324,7 +324,26 @@ class World:
 
         return [tuple(row) for row in samples]
 
-    def generate_rgba_array(self, b=180, a_even=255, a_odd=140):
+    def get_probability_of_view(
+        self,
+        x:float,
+        threshold:Optional[float]=0.8,
+        steepness:Optional[float]=12.0,
+    ) -> float:
+        return 1.0 / (1.0 + np.exp(-steepness * (x - threshold)))
+
+    def coordinator_view(self, information_investment:float) -> List[float]:
+        # Initiate view
+        terrain = np.ones((self.height, self.width)) * 140
+        # Draw coins that are randomly selected to be seen according to investment
+        for (x, y) in self.coin_positions():
+            # Determine probability of view given investment
+            p = self.get_probability_of_view(information_investment)
+            if self._rng.random() < p:
+                terrain[y, x] = 255
+        return terrain.tolist()
+
+    def generate_rgba_array(self, b=180, a_even=255, a_odd=140) -> List[float]:
         coords = self.coin_positions()
         xs, ys = zip(*coords)
         rows = np.array(ys)
