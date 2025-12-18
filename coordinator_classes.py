@@ -59,8 +59,8 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 SliderControl(
                     start_value=self.set_start_value_investment(participant),
                     min_value=0.0,
-                    max_value=1.0,
-                    n_steps=100,
+                    max_value=0.85,
+                    n_steps=86,
                 ),
                 time_estimate=self.time_estimate,
             ),

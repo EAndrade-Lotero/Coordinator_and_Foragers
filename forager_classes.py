@@ -135,8 +135,7 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
             taken_ids = [int(idx) for idx in taken_ids]
             # Get a list of available ids
             available_ids = [idx for idx in range(NUM_FORAGERS) if idx not in taken_ids]
-            assert (
-                        len(available_ids) > 0), f"Error: Attempt to assign forager (trial:{trial_id}) in node (node:{participant.current_trial.node.id})."
+            assert (len(available_ids) > 0), f"Error: Attempt to assign forager (trial:{trial_id}) in node (node:{participant.current_trial.node.id})."
             # Get the first available id as a forager_id
             forager_id = available_ids[0]
             # Register forager id in working memory for the trial
@@ -182,12 +181,12 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         # Subtract the coins gathered by each forager
         for answer in other_foragers_answers:
             other_forager_coins = [tuple(coin) for coin in answer["coins_foraged"]]
-            logger.info(f"Other forager collected coins: {other_forager_coins}")
+            # logger.info(f"Other forager collected coins: {other_forager_coins}")
             if isinstance(other_forager_coins, str):
                 other_forager_coins = ast.literal_eval(other_forager_coins)
             if len(other_forager_coins) > 0:
                 coins = [(coin) for coin in coins if coin not in other_forager_coins]
-        logger.info(f"Remaining coins: {coins}")
+        # logger.info(f"Remaining coins: {coins}")
         return coins
 
     def get_initial_coins(self, participant) -> List[Tuple[int, int]]:
@@ -203,7 +202,7 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                 logger.error(f"Error parsing {coins}")
                 raise e
         assert isinstance(coins, list), f"Error: expected list, got {type(coins)}"
-        logger.info(f"All coins in the world at the beginning: {coins}")
+        # logger.info(f"All coins in the world at the beginning: {coins}")
         return coins
 
     def get_max_gear(self, participant) -> int:

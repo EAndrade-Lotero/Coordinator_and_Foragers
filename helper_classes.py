@@ -105,7 +105,7 @@ class World:
             "num_coins": NUM_COINS,
             "num_centroids": NUM_CENTROIDS,
             "dispersion": DISPERSION,
-            "distribution": "linear"
+            "distribution": "circular"
         }
         world = World(**world_parameters)
         world.clear()
