@@ -11,7 +11,7 @@ NUM_COINS = 100
 DISPERSION = 10
 
 INITIAL_WEALTH = 3
-LIST_OF_DISTRIBUTIONS = ["circular"]
+LIST_OF_DISTRIBUTIONS = ["circular", "linear_up", "linear_down"]
 INITIAL_POSITIONS = [(0,0), (WORLD_WIDTH, WORLD_HEIGHT)]
 
 STARTING_SLIDERS = {
@@ -24,7 +24,9 @@ NUM_TRIALS_PER_PARTICIPANT = 2
 MAX_NODES_PER_CHAIN = 10
 
 WORLD_PATHS = [
-    "static/assets/images/map.json"
+    "static/assets/images/map1.json",
+    "static/assets/images/map2.json",
+    "static/assets/images/map3.json",
 ]
 
 IMAGE_PATHS = {

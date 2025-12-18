@@ -70,7 +70,7 @@ class World:
         # Check width and height
         if self.width <= 0 or self.height <= 0:
             raise ValueError("width and height must be positive.")
-        self.grid = np.zeros((self.width, self.height))
+        self.grid = np.zeros((self.height, self.width))
         logger.info(f"Grid of dimensions: {self.grid.shape} created...")
         # Check number of coins
         coin_percentage = num_coins / (self.width * self.height)
@@ -81,13 +81,13 @@ class World:
         # Check centroids
         self.num_centroids = num_centroids
         # Check distribution
-        assert(distribution in ["linear", "circular", "oval"]), f"Dispersion {distribution} not supported. Choose from ['linear', 'circular', 'oval']."
+        assert(distribution in ["linear_up", "linear_down", "circular", "oval"]), f"Dispersion {distribution} not supported. Choose from ['linear', 'circular', 'oval']."
         self.distribution = distribution
         # Check dispersion
         assert(dispersion > 0), f"Dispersion must be greater than 0 (but got {dispersion})."
         self.dispersion = dispersion
         logger.info("Placing coins...")
-        # self._place_coins()
+        self._place_coins()
 
     @staticmethod
     def generate_from_json(path: Path) -> "World":
@@ -115,6 +115,14 @@ class World:
         world.grid[rows, cols] = 1
         return world
 
+    def place_given_coins(self, coins: List[Tuple[int, int]]) -> None:
+        xs, ys = zip(*coins)
+        rows = np.array(ys)
+        assert(np.all(rows < self.height))
+        cols = np.array(xs)
+        assert(np.all(cols < self.width))
+        self.grid[rows, cols] = 1
+
     def coin_positions(self) -> List[Tuple[int, int]]:
         """List of (row, col) positions where coins are present."""
         rc = np.argwhere(self.grid == 1)  # (row, col)
@@ -130,10 +138,10 @@ class World:
 
     def clear(self) -> None:
         """Remove all coins (set all cells to 0)."""
-        self.grid = np.zeros((self.width, self.height))
+        self.grid = np.zeros((self.height, self.width))
 
     def _place_coins(self) -> None:
-        """Dispatch to the chosen distribution strategy."""
+        """Create and place coins."""
         self.clear()
         if self.num_coins == 0:
             return
@@ -156,14 +164,23 @@ class World:
             coords_y = [int(y) for x, y in sample_coins]
             self.grid[coords_y, coords_x] = 1
 
+        # Add random coins
+        coins = self.create_random_coins(0.01)
+        self.place_given_coins(coins)
+
     def get_centroids(self) -> List[Tuple[int, int]]:
         """Return the centroids of coins placed."""
         if self.num_centroids == 1:
             return [(int(self.width / 2), int(self.height / 2))]
 
-        if self.distribution == "linear":
+        if self.distribution == "linear_down":
             sample = np.linspace(0, 1, self.num_centroids + 2)[1:-1]
             sample = [(int(x * self.width), int(x * self.height)) for x in sample]
+            return sample
+
+        if self.distribution == "linear_up":
+            sample = np.linspace(0, 1, self.num_centroids + 2)[1:-1]
+            sample = [(int(x * self.width), self.height - int(x * self.height)) for x in sample]
             return sample
 
         elif self.distribution == "circular":
@@ -185,6 +202,16 @@ class World:
 
         else:
             raise NotImplementedError(f"Dispersion {self.distribution} not supported. Choose from ['linear', 'circular', 'oval'].")
+
+    def create_random_coins(self, p:float) -> List[Tuple[int, int]]:
+        """Create random coins."""
+        assert(0 <= p <= 1)
+        coins = []
+        for x in range(self.width):
+            for y in range(self.height):
+                if self._rng.random() < p:
+                    coins.append((x, y))
+        return coins
 
     def __str__(self) -> str:
         """ASCII representation: '1' for coin, '.' for empty."""

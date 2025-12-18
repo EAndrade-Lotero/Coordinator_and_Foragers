@@ -6,8 +6,7 @@
 from markupsafe import Markup
 from typing import Union
 
-from psynet import participant
-# from psynet.page import InfoPage
+from psynet.page import InfoPage
 from psynet.utils import get_logger
 from psynet.modular_page import (
     ModularPage,
@@ -16,7 +15,6 @@ from psynet.modular_page import (
 )
 from psynet.trial.create_and_rate import CreateTrialMixin
 from psynet.trial.imitation_chain import ImitationChainTrial
-from psynet.modular_page import PushButtonControl
 from psynet.timeline import CodeBlock
 
 from .custom_pages import (
@@ -28,7 +26,6 @@ from .text_variables import (
     INVESTMENT_INSTRUCTIONS,
     POSITIONING_INSTRUCTIONS,
 )
-from .game_parameters import INITIAL_POSITIONS
 
 logger = get_logger()
 
@@ -50,11 +47,11 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
     def show_trial(self, experiment, participant):
 
         list_of_pages = [
-            # # Greetings
-            # InfoPage(
-            #     Markup(COORDINATOR_INSTRUCTIONS),
-            #     time_estimate=5
-            # ),
+            # Greetings
+            InfoPage(
+                Markup(COORDINATOR_INSTRUCTIONS),
+                time_estimate=5
+            ),
             # Asks coordinator to invest
             ModularPage(
                 "investment",
@@ -82,16 +79,6 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 ),
                 time_estimate=self.time_estimate,
             ),
-            # ModularPage(
-            #     "positions",
-            #     Prompt(text="This is a dummy positioning page"),
-            #     PushButtonControl(
-            #         choices=[INITIAL_POSITIONS],
-            #         labels=["Next"],
-            #         arrange_vertically=False,
-            #     ),
-            #     time_estimate=self.time_estimate,
-            # ),
             SliderSettingPage(
                 dimension="overhead",
                 start_value=self.get_slider_value(participant, "overhead"),
