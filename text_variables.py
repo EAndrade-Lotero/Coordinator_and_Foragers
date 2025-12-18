@@ -1,5 +1,5 @@
 # module with the texts as variables to be used in the respective pages
-from .game_parameters import NUM_FORAGERS
+from .game_parameters import NUM_FORAGERS, WORLD_PATHS
 
 ############################################################
 # Format
@@ -95,7 +95,7 @@ WELCOME_TEXT = f"""
     </p>
     <p>
         Roles will be assigned in order of arrival to an iteration of the game. Each player will be asked to play
-        three iterations.
+        {len(WORLD_PATHS)} iterations.
     </p>
 
     <h2>Score</h2>
@@ -165,15 +165,20 @@ COORDINATOR_INSTRUCTIONS = f"""
     {STYLE}
 
     <h1>Instructions for the Coordinator</h1>
-
     <br>
     <p>
     Welcome! You have been selected to play as the coordinator. 
     </p>
+    <h2>
+    Goal
+    </h2>
     <p>    
     Your role is to make sure that foragers are in a position to forage the maximum number of coins. 
     So you must locate them at the best places in the terrain. You will need information for this. 
     </p>
+    <h2>
+    Information
+    </h2>
     <p>        
     Congratulations! You have been given an endowment of 10 coins!
     </p>
@@ -184,30 +189,44 @@ COORDINATOR_INSTRUCTIONS = f"""
     How many coins will be visible depends on how much of your endowment you invest. 
     Please follow the instructions in the “Gathering information” page to make your investment.
     </p>
+    <h2>
+    Assign foragers
+    </h2>
     <p>
     Once you have made your investment in information, you will be redirected to the “Assign foragers” page.
     There you will see a map with the discovered coins and icons of {NUM_FORAGERS} foragers. Drag these icons 
     onto the locations that will allow foragers to collect more coins. Please follow the instructions in
     the “Positioning foragers” page. 
     </p>
+    <h2>
+    Score
+    </h2>
     <p>
     Once you are done with this critical task, in the “Score” page you will see the total number of 
     coins collected by foragers on the previous iteration. You will also see your score based on this number. 
     </p>
+    <h2>
+    Well-being report
+    </h2>
     <p>
     The score is determined by the characteristics of the social contract, which you can evaluate in the 
     “Well-being report” page. Follow the instructions in this page to provide your report.
     </p>
+    <h2>
+    Tweak the social contract
+    </h2>
     <p>
     Finally, you will be given the power to tweak the three dimensions of the social contract. 
-    Follow the instructions in the “Tweaking the social contract” page to move the parameters in the direction that 
-    you consider will provide you with a better well-being.
+    Follow the instructions in the “Tweaking the social contract” pages to move the parameters 
+    in the direction that  you consider will provide you with a better well-being.
     </p>
+    <br>
+    <br>
     <p>
     That’s it for instructions. Enjoy playing “The coordinator and foragers” game!
     </p>
-    <p>
-    If you are ready to start the game, press the button 'Next'.
+    <p class="final-note">
+    If you are ready to continue, press the 'Next' button.
     </p>
 
 </body>
@@ -231,13 +250,18 @@ INVESTMENT_INSTRUCTIONS = f"""
     </p>
     <p>
     Move the slider to determine the percentage of your endowment that you want to invest. 
-    Once you are done, press the button 'Next'.
+    </p>
+    <p class="final-note">
+    If you are ready to continue, press the 'Next' button.
     </p>
     <br>
 
 </body>
 </html>
 """
+
+############################################################
+# Positioning page
 
 POSITIONING_INSTRUCTIONS = f"""
     {STYLE}
@@ -247,7 +271,9 @@ POSITIONING_INSTRUCTIONS = f"""
     <p>
     Assign each forager to a location to maximize the coins they can forage. 
     Simply drag each icon and drop it to the selected position on the map. 
-    Once you are done, press the button 'Next'.
+    </p>
+    <p class="final-note">
+    When you are ready to continue, press the 'Next' button.
     </p>
     <br>
 
@@ -256,17 +282,32 @@ POSITIONING_INSTRUCTIONS = f"""
 """
 
 ############################################################
-# Coordinator score page
+# Slider tweaking
 
-COORDINATOR_SCORE = f"""
+SLIDER_SETTING_TEXT = lambda dimension: f"""
     {STYLE}
 
-    <h1>Score</h1>
-
+    <h1>Tweaking the social contract</h1>
+    
+    <h2>{dimension.upper()}</h2>
+    <br>
     <p>
-    Once you are done, press the button 'Next'.
+    This is the place to modify the parameters of the social contract established so far.
+    </p>
+    <p>
+    You can now modify the {dimension} parameter. 
+    </p>
+    <p>
+    The slider below displays its current level.
+    </p>
+    <p>
+     Please move it to match your desired level of {dimension}.
     </p>
     <br>
+    </p>
+    <p class="final-note">
+    When you are ready to continue, press the 'Next' button.
+    </p>
 
 </body>
 </html>
@@ -279,44 +320,120 @@ FORAGER_INSTRUCTIONS = f"""
     {STYLE}
 
     <h1>Instructions for a Forager</h1>
-
-    <p>
-    Welcome! You have been selected to play as a forager. Your task is simple: collect as many coins as you can while there is still fuel in your truck.
-    You will be driving a small truck around a terrain, starting from an initial position selected by the coordinator. You will use this truck to collect coins by driving over them. You can accelerate, steer, break, and change gears. Don’t worry, it’s very easy to do it and you will be an expert driver in no time. 
-    The only thing you should remember about gears is that they control two things. They control speed: the higher the gear number, the faster you go. The second, and most important thing, is that you will only be able to collect a coin if you pass over it and the truck is in first gear. No rushing like crazy collecting coins right and left; drive and collect safely.
-    How many gears your truck has depends on the dimension “Foragers’ maximum speed” from the social contract.
-    </p>
     <br>
     <p>
-    Once your truck runs out of fuel, your task is over. You will be directed to the “Score” page, in which you will see the total number of coins collected by foragers on the previous iteration. You will also see your reward based on this number of coins. This reward is determined by the characteristics of the social contract. 
-    Note that the monetary reward that you will receive at the end of the experiment is the sum of rewards from the three iterations you play. 
+    Welcome! You have been selected to play as a forager! 
+    </p>
+    <h2>
+    Goal
+    </h2>
+    <p>
+    Your task is simple: collect as many coins as you can while there is still fuel in your UTV.
+    You will be driving around a terrain, starting from an initial position selected by the coordinator. 
+    You will use this vehicle to collect coins by driving over them. 
+    </p>
+    <h2>
+    Your vehicle
+    </h2>
+    <p>
+    You can accelerate, steer, break, and change gears. Don’t worry, it’s very easy to do it and you will be 
+    an expert driver in no time. The only thing you should remember about gears is that they control two things. 
+    They control speed: the higher the gear number, the faster you go. 
+    </p>
+    <p>
+    The second, and most important thing, is that <strong>you will only be able to collect a coin if the truck 
+    is in first gear</strong> when you pass over it. 
+    </p>
+    <p>    
+    Do not randomly move collecting coins right and left; drive and collect safely and thoughtfully.
+    </p>
+    <p>    
+    How many gears your UTV has depends on the dimension “Foragers’ maximum speed” from the social contract.
+    </p>
+    <h2>
+    Score
+    </h2>
+    <p>
+    Once your UTV runs out of fuel, your task is over. You will be directed to the “Score” page, 
+    in which you will see the total number of coins collected by foragers on the previous iteration. 
+    You will also see your reward based on this number of coins. This reward is determined by 
+    the characteristics of the social contract. 
+    </p>
+    <h2>
+    Well-being report
+    </h2>
+    <p>
+    In the page “Well-being report” you will be asked to rate how well you feel about the score obtained. 
+    Follow the instructions in this page to provide your report.
     </p>
     <br>
-    <p>
-    As a refresher, here are the three formulas used to calculate your reward:
-    </p>
-    <div class="formula-block">
-        wage_forager_i = total_coins * (1 - overhead) * (wages / 4)
-    </div>
-    <div class="formula-block">
-        commission_forager_i = coins_collected_by_i * (1 - overhead) * (1 - wages)
-    </div>
-    <div class="formula-block">
-        forager_i_reward = wage_forager_i + commission_forager_i
-    </div>
-    <br>
-    <p>
-    For instance, suppose the foragers collected 100 coins in the previous iteration. If the overhead was 20%, you and your fellow foragers will be left with 80 of these coins. If the wages parameter is 75%, then 60 of these coins will be equally split among foragers. This will give you 15 coins from wages. Moreover, if you collected 50 coins, this means that your commission is 10 coins (that is, 50% of the remaining 20 coins). In the end, your reward will be 15 + 10 = 25 coins.
-    </p>
-    <br>
-    <p>
-    In the page “Well-being report” you will be asked to rate how well you feel about the socre obtained. Follow the instructions in this page to provide your report.
-    [DEPENDING ON CONDITION] Finally, you will be given the power to tweak the three dimensions of the social contract. Follow the instructions in the page “Tweaking the social contract” to move the parameters in the direction that you consider will provide you with a better well-being (or keep them, if you are happy as it is).
-    </p>
     <br>
     <p>
     That’s it for instructions. Enjoy playing “The coordinator and foragers” game!
     </p>
+    <p class="final-note">
+    If you are ready to continue, press the 'Next' button.
+    </p>
+
+</body>
+</html>
+"""
+
+############################################################
+# Time to forage
+
+FORAGING_PAGE = f"""
+It's time to forage! Remember, you will only be able to forage a coin if your
+UTV is in first gear. Enjoy the ride!
+"""
+
+############################################################
+# Score page
+
+SCORE_TEXT = lambda reward_text: f"""
+    {STYLE}
+
+    <h1>Score</h1>
+    <br>
+    {reward_text}
+    <br>
+    <p class="final-note">
+    When you are ready to continue, press the 'Next' button.
+    </p>
+    <br>
+
+</body>
+</html>
+"""
+
+############################################################
+# Well-being page
+
+WELL_BEING_TEXT = f"""
+    {STYLE}
+
+    <h1>Well-being report</h1>
+    <br>
+    <p>
+    It is time to take a step back and calmly ask yourself whether the result obtained
+    agrees with the work that you have put in so far. 
+    </p>
+    <p>
+    A 0% agreement, at the far left
+    of the slider, would mean that you definitely want a change in the social contract.
+    </p>
+    <p>
+    A 100% agreement, at the far right of the slider, would mean that things are just fine
+    and we can leave them be.
+    </p>
+    <p>
+    Use the slider below to report your well-being with the obtained result.
+    </p>
+    <br>
+    <p class="final-note">
+    When you are ready to continue, press the 'Next' button.
+    </p>
+    <br>
 
 </body>
 </html>

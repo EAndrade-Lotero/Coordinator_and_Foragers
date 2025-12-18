@@ -42,7 +42,7 @@ class PositioningControl(Control):
         super().__init__()
         # Create world
         self.world = World.generate_from_json(Path(world_path))
-        logger.info(f"Coins created at: {self.world.coin_positions()}")
+        # logger.info(f"Coins created at: {self.world.coin_positions()}")
         # Check investment (used in probability of showing a coin)
         assert investment is not None
         # Generate attributes
@@ -63,7 +63,7 @@ class PositioningControl(Control):
                 'coins': self.world.coin_positions()
             }
             logger.info(f"Coordinator decided positions: {positions_and_coins['positions']}")
-            logger.info(f"World contains coins in: {positions_and_coins['coins']}")
+            # logger.info(f"World contains coins in: {positions_and_coins['coins']}")
             return positions_and_coins
         except (ValueError, AssertionError):
             return f"INVALID_RESPONSE"
@@ -86,7 +86,7 @@ class ForagingControl(Control):
         self.pos_y = position[1]
         # Create world from json
         self.world = World.generate_from_coins(coins)
-        logger.info(f"Coins in world: {self.world.coin_positions()}")
+        # logger.info(f"Coins in world: {self.world.coin_positions()}")
         self.map = self.world.generate_terrain()
         self.forager_url = context["forager_url"]
         self.map_url = self.world.map_path

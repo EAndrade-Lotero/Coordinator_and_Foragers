@@ -16,6 +16,7 @@ from .custom_trialmaker import CreateAndRateTrialMaker
 from .custom_node import CustomNode
 from .game_parameters import (
     NUM_FORAGERS,
+    INITIAL_WEALTH,
     STARTING_SLIDERS,
     WORLD_PATHS,
     IMAGE_PATHS,
@@ -37,9 +38,10 @@ def get_trial_maker():
             context=IMAGE_PATHS,
             seed={
                 "sliders": STARTING_SLIDERS,
-                "world_path": world_path
+                "world_path": world_path,
+                "n_coins": INITIAL_WEALTH,
             }
-        ) for world_path in WORLD_PATHS
+        ) for world_path in WORLD_PATHS[:1]
     ]
 
     return CreateAndRateTrialMaker(

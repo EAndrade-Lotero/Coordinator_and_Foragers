@@ -7,6 +7,7 @@ from typing import Dict, Any
 from psynet.trial import ChainNode
 from psynet.utils import get_logger
 from psynet.trial.create_and_rate import CreateAndRateNodeMixin
+from psynet.trial.imitation_chain import ImitationChainTrial
 
 logger = get_logger()
 
@@ -28,13 +29,40 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
 
         # Get new sliders settings
         coordinator = self.get_coordinator(trials)
-        overhead = coordinator.answer["overhead"]
 
-        # Beget new setting
-        seed["overhead"] = overhead,
+        # Beget sliders settings
+        for parameter in ["overhead", "wages", "prerogative"]:
+            seed["sliders"][parameter] = coordinator.answer["parameter"],
+
+        # Beget number of coins
+        forager_trials = [
+            trial for trial in trials
+            if (
+                    trial.finalized == True
+                    and trial.failed == False
+                    and "forager" in str(trial).lower()
+            )
+        ]
+        coins = [self.get_coins(trial) for trial in forager_trials]
+        n_coins = sum(coins)
+        seed["n_coins"] = n_coins
+
         return seed
 
     def get_coordinator(self, trials):
         coordinator = [trial for trial in trials if 'coordinator' in str(trial).lower()]
         assert len(coordinator) == 1
         return coordinator[0]
+
+    def get_coins(self, trial) -> int:
+        answer = self.get_answers_from_trial(trial)
+        coins = answer["coins_foraged"]
+        return len(coins)
+
+    def get_answers_from_trial(self, trial: ImitationChainTrial) -> Dict[str, Any]:
+        """Extract the answers from the given trial"""
+        assert isinstance(trial, ImitationChainTrial), f"Error: expected ImitationChainTrial, got {type(trial)}"
+        # Extract the answer
+        answer = self.get_target_answer(trial)
+        assert isinstance(answer, dict), f"Error: expected dict, got {type(answer)} --- {answer=}"
+        return answer

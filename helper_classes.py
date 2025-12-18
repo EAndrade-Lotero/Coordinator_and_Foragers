@@ -480,27 +480,67 @@ class RewardProcessing:
     """Processes rewards and gives feedback"""
 
     @staticmethod
-    def get_reward_text(
+    def get_reward(
         n_coins: int,
-        slider: Any,
+        sliders: Any,
         trial_type: str
     ) -> str:
-        trial_types = ["coordinator"] + [f"forager-{i}" for i in range(NUM_FORAGERS)]
+        trial_types = ["coordinator", "forager"]
         assert(trial_type in trial_types), f"Invalid trial type. Expected one of {trial_types} but got {trial_type}."
 
-        # Get
         accumulated_wealth = WealthTracker(n_coins)
-        accumulated_wealth.initialize(slider)
+        accumulated_wealth.initialize(sliders)
 
         if trial_type == "coordinator":
-            wealth = accumulated_wealth.get_coordinator_wealth()
+            score = accumulated_wealth.get_coordinator_wealth()
         elif trial_type.startswith("forager"):
             forager_id = trial_type.split("-")[1]
             forager_id = int(forager_id)
-            wealth = accumulated_wealth.get_forager_wealth(forager_id)
+            score = accumulated_wealth.get_forager_wealth(forager_id)
         else:
             raise ValueError(f"Invalid trial type: {trial_type}. Expected one of {trial_types}.")
 
-        reward_text = f"The total number of coins collected on the previous iteration is {n_coins}.\n\n"
-        reward_text += f"Based on the existing contract, you received {wealth} coins.\n\n"
+        reward_text = f"<p>The total number of coins collected on the previous iteration was {n_coins}.</p>"
+        reward_text += f"<p>Based on the existing contract, you received {int(score)} coins.</p>"
+        reward_text += f"<br>"
+        reward_text += f"<p>How was this score obtained?</p>"
+        if trial_type.startswith("coordinator"):
+            reward_text += f"""
+        <p>
+        Here is the formula used to calculate your score:
+        </p>
+        <div class="formula-block">
+            coordinator_reward = endowment_kept + total_coins * overhead
+        </div>
+        <p>
+        For instance, suppose the foragers collected 100 coins in the previous iteration. 
+        If the overhead was 50%, you will keep 50 of these coins. Moreover, if your initial 
+        endowment was 10 coins and you only invested 20% in information, keeping 8 coins 
+        from your endowment, your score will be 58 coins.
+        </p>
+"""
+        elif trial_type.startswith("forager"):
+            reward_text += f"""
+        <p>
+        Each forager’s reward is calculated using the three following formulas:
+        </p>
+        <div class="formula-block">
+            wage_forager_i = total_coins * (1 - overhead) * (wages / 4)
+        </div>
+        <div class="formula-block">
+            commission_forager_i = coins_collected_by_i * (1 - overhead) * (1 - wages)
+        </div>
+        <div class="formula-block">
+            forager_i_reward = wage_forager_i + commission_forager_i
+        </div>
+        <p>
+        For instance, suppose the foragers collected 100 coins in the previous iteration. 
+        If the overhead was 20%, you and your fellow foragers will be left with 80 of these coins. 
+        If the wages parameter is 75%, then 60 of these coins will be equally split among foragers. 
+        This will give you 15 coins from wages. Moreover, if you collected 50 coins, this means 
+        that your commission is 10 coins (that is, 50% of the remaining 20 coins). 
+        In the end, your score will be 15 + 10 = 25 coins.
+        </p>
+    """
+
         return reward_text

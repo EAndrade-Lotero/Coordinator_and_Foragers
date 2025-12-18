@@ -10,6 +10,7 @@ from typing import (
     Any, Tuple
 )
 
+from psynet.page import InfoPage
 from psynet.utils import get_logger
 from psynet.modular_page import (
     ModularPage,
@@ -21,8 +22,13 @@ from psynet.trial.imitation_chain import ImitationChainTrial
 
 from .custom_node import CustomNode
 from .custom_front_end import ForagingControl
+from .helper_classes import RewardProcessing
 from .game_parameters import NUM_FORAGERS
-from .text_variables import FORAGER_INSTRUCTIONS
+from .text_variables import (
+    FORAGER_INSTRUCTIONS,
+    FORAGING_PAGE,
+    SCORE_TEXT,
+)
 
 logger = get_logger()
 
@@ -54,17 +60,28 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                     labels=["Next"],
                     arrange_vertically=False,
                 ),
+                time_estimate=self.time_estimate,
             ),
             ModularPage(
                 "coins_foraged",
-                Prompt(text=f"You have been assigned to position: {self.get_my_trial_position(participant)}"),
+                Prompt(FORAGING_PAGE),
                 ForagingControl(
                     position=self.get_my_trial_position(participant),
                     coins=self.get_world_coins(participant),
                     max_gear=self.get_max_gear(participant),
                     context=self.context,
                 ),
-            )
+                time_estimate=self.time_estimate,
+            ),
+            InfoPage(
+                # f"You have collected {self.get_num_coins(participant)} coins!"
+                f"You have collected 0 coins!",
+                time_estimate=self.time_estimate,
+            ),
+            # InfoPage(
+            #     Markup(self.get_reward_text(participant)),
+            #     time_estimate=self.time_estimate,
+            # ),
         ]
 
         return list_of_pages
@@ -210,9 +227,32 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         prerogative = coordinator_answers["prerogative"]
         if isinstance(prerogative, str):
             prerogative = ast.literal_eval(prerogative)
-        assert isinstance(prerogative, float), f"Error: expected float, got {type(max_gear)}"
+        assert isinstance(prerogative, float), f"Error: expected float, got {type(prerogative)}"
         max_gear = int(prerogative * 2)
         return max_gear
+
+    def get_num_coins(self, participant) -> int:
+        if participant.answer_accumulators[-1] is not None:
+            last_answer = participant.answer_accumulators[-1]
+            # assert isinstance(last_answer, List(Tuple[int, int])), f"Error: expected list, got {type(last_answer)}"
+            assert "coins_foraged" in last_answer.keys()
+            coins = last_answer["coins_foraged"]
+            if isinstance(coins, str):
+                coins = ast.literal_eval(coins)
+            return len(coins)
+        else:
+            return 0
+
+    def get_reward_text(self, participant) -> Markup:
+        n_coins = participant.current_trial.definition["n_coins"]
+        sliders = participant.current_trial.definition["sliders"]
+        text = RewardProcessing.get_reward(
+            n_coins=n_coins,
+            sliders=sliders,
+            trial_type="forager",
+        )
+        text = SCORE_TEXT(text)
+        return Markup(text)
 
     def format_answer(self, raw_answer, **kwargs) -> Union[float, str]:
         try:

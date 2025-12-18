@@ -25,7 +25,10 @@ from .text_variables import (
     COORDINATOR_INSTRUCTIONS,
     INVESTMENT_INSTRUCTIONS,
     POSITIONING_INSTRUCTIONS,
+    SCORE_TEXT,
+    WELL_BEING_TEXT,
 )
+from .helper_classes import RewardProcessing
 
 logger = get_logger()
 
@@ -79,6 +82,23 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 ),
                 time_estimate=self.time_estimate,
             ),
+            InfoPage(
+                Markup(self.get_reward_text(participant)),
+                time_estimate=self.time_estimate,
+            ),
+            # Asks coordinator well-being
+            ModularPage(
+                "well-being",
+                Prompt(Markup(WELL_BEING_TEXT)),
+                SliderControl(
+                    start_value=0.0,
+                    min_value=0.0,
+                    max_value=1,
+                    n_steps=100,
+                ),
+                time_estimate=self.time_estimate,
+            ),
+            # Tweak sliders
             SliderSettingPage(
                 dimension="overhead",
                 start_value=self.get_slider_value(participant, "overhead"),
@@ -135,4 +155,13 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
         assert isinstance(value, float), f"Error: expected float, got {type(value)} --- ({value=})."
         return value
 
-
+    def get_reward_text(self, participant) -> Markup:
+        n_coins = participant.current_trial.definition["n_coins"]
+        sliders = participant.current_trial.definition["sliders"]
+        text = RewardProcessing.get_reward(
+            n_coins=n_coins,
+            sliders=sliders,
+            trial_type="coordinator",
+        )
+        text = SCORE_TEXT(text)
+        return Markup(text)
