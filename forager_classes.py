@@ -249,6 +249,8 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
         prerogative = coordinator_answers["prerogative"]
         if isinstance(prerogative, str):
             prerogative = ast.literal_eval(prerogative)
+        if isinstance(prerogative, tuple):
+            prerogative = prerogative[0]
         assert isinstance(prerogative, float), f"Error: expected float, got {type(prerogative)}"
         max_gear = int(prerogative * 2)
         return max_gear

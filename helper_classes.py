@@ -417,6 +417,8 @@ class WealthTracker:
 
         # Calculate foragers' wealth
         wages_proportion = sliders["wages"]
+        if isinstance(wages_proportion, tuple):
+            wages_proportion = wages_proportion[0]
         wages = remaining * wages_proportion
         print("Wages:", wages)
 
@@ -430,6 +432,8 @@ class WealthTracker:
     def calculate_coordinator_reward(self, sliders: Dict[str, float]) -> None:
         # Get slider parameters
         overhead = sliders["overhead"]
+        if isinstance(overhead, tuple):
+            overhead = overhead[0]
         assert isinstance(overhead, float), f"Error: Expected overhead of type float, got {type(overhead)} --- {overhead=}"
         self.coordinator_wealth = overhead * self.n_coins
 
