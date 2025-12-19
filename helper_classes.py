@@ -403,69 +403,35 @@ class WealthTracker:
         self.coordinator_wealth: Union[float, None] = None
         self.foragers_wealth: Union[List[float], None] = None
 
-    def update_from_trials(self, trials: List[Any], sliders: Dict[str, float]) -> None:
-        forager_trials = [t for t in trials if 'forager' in str(t).lower()]
-        assert len(forager_trials) == self.num_foragers
-
-        # Get forager production in previous episode
-        foragers_payoffs = self.get_coins_from_foragers(forager_trials)
-        self.n_coins = sum(foragers_payoffs)
-        foragers_proportions = np.array(foragers_payoffs) / self.n_coins
-
-        logger.info(f"Foragers collected {self.n_coins} coins in total last round.")
-        logger.info(f"Foragers proportions: {foragers_proportions}")
-
-        # Get slider parameters
-        assert("overhead" in sliders.keys()), f"Error: sliders has to have an 'overhead' key (observed keys are{sliders.keys()}) )."
-        assert("wages" in sliders.keys()), f"Error: sliders has to have an 'wages' key (observed keys are{sliders.keys()}) )."
-        overhead = sliders["overhead"]
-        wages_proportion = sliders["wages"]
-
-        # Calculate coordinator's wealth
-        self.coordinator_wealth = overhead * self.n_coins
-        remaining = self.n_coins - self.coordinator_wealth
-
-        # Calculate foragers' wealth
-        wages = remaining * wages_proportion
-        remaining = remaining - wages
-        foragers_split = foragers_proportions * remaining
-        self.foragers_wealth = wages + foragers_split
-
-    def get_coins_from_foragers(self, trials: List[Any]) -> NDArray[np.float64]:
-        foragers_payoffs = []
-        for trial in trials:
-            answers = self.get_coins(trial)
-            logger.info(f"{str(trial)} => {answers}")
-            foragers_payoffs.append(answers)
-        return np.array(foragers_payoffs)
-
-    def get_coins(self, trial: Any) -> int:
-        logger.info(f"{hasattr(trial, "vars['coins_foraged']")}")
-        return 10
-
     def initialize(self, sliders: Dict[str, float]) -> None:
-        # Get slider parameters
-        wages_proportion = sliders["wages"]
+
+        assert(self.n_coins is not None)
+        assert(isinstance(self.n_coins, int))
+        print("Number of coins: ", self.n_coins)
 
         # Calculate coordinator's wealth
-        coordinator_wealth = self.calculate_coordinator_reward(sliders)
+        self.calculate_coordinator_reward(sliders)
 
         remaining = self.n_coins - self.coordinator_wealth
+        print("Remaining after overhead:", remaining)
 
         # Calculate foragers' wealth
+        wages_proportion = sliders["wages"]
         wages = remaining * wages_proportion
-        remaining = remaining - wages
-        foragers_split = np.array([remaining / self.num_foragers]) * self.num_foragers
-        self.foragers_wealth = wages + foragers_split
+        print("Wages:", wages)
 
-    def calculate_coordinator_reward(self, sliders: Dict[str, float]) -> float:
+        remaining = remaining - wages
+        foragers_split = np.array([remaining / self.num_foragers] * self.num_foragers)
+        self.foragers_wealth = wages / self.num_foragers + foragers_split
+        print("Foragers wealth:", self.foragers_wealth)
+
+        logger.info(f"Foragers wealth: {self.foragers_wealth}")
+
+    def calculate_coordinator_reward(self, sliders: Dict[str, float]) -> None:
         # Get slider parameters
         overhead = sliders["overhead"]
+        assert isinstance(overhead, float), f"Error: Expected overhead of type float, got {type(overhead)}"
         self.coordinator_wealth = overhead * self.n_coins
-        return self.coordinator_wealth
-
-    # def calculate_foragers_reward(self, slider: SliderValues) -> float:
-
 
     def get_coordinator_wealth(self) -> float:
         assert(self.coordinator_wealth is not None), "Coordinator wealth is not set yet. Run update() first."
@@ -485,7 +451,7 @@ class RewardProcessing:
         sliders: Any,
         trial_type: str
     ) -> str:
-        trial_types = ["coordinator", "forager"]
+        trial_types = ["coordinator"] + [f"forager-{i}" for i in range(NUM_FORAGERS)]
         assert(trial_type in trial_types), f"Invalid trial type. Expected one of {trial_types} but got {trial_type}."
 
         accumulated_wealth = WealthTracker(n_coins)
@@ -510,7 +476,7 @@ class RewardProcessing:
         Here is the formula used to calculate your score:
         </p>
         <div class="formula-block">
-            coordinator_reward = endowment_kept + total_coins * overhead
+            coordinator_score = endowment_kept + total_coins * overhead
         </div>
         <p>
         For instance, suppose the foragers collected 100 coins in the previous iteration. 
@@ -522,7 +488,7 @@ class RewardProcessing:
         elif trial_type.startswith("forager"):
             reward_text += f"""
         <p>
-        Each forager’s reward is calculated using the three following formulas:
+        Each forager’s score is calculated using the three following formulas:
         </p>
         <div class="formula-block">
             wage_forager_i = total_coins * (1 - overhead) * (wages / 4)
@@ -531,7 +497,7 @@ class RewardProcessing:
             commission_forager_i = coins_collected_by_i * (1 - overhead) * (1 - wages)
         </div>
         <div class="formula-block">
-            forager_i_reward = wage_forager_i + commission_forager_i
+            forager_i_score = wage_forager_i + commission_forager_i
         </div>
         <p>
         For instance, suppose the foragers collected 100 coins in the previous iteration. 

@@ -32,7 +32,7 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
 
         # Beget sliders settings
         for parameter in ["overhead", "wages", "prerogative"]:
-            seed["sliders"][parameter] = coordinator.answer["parameter"],
+            seed["sliders"][parameter] = coordinator.answer[parameter],
 
         # Beget number of coins
         forager_trials = [
@@ -41,9 +41,10 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
                     trial.finalized == True
                     and trial.failed == False
                     and "forager" in str(trial).lower()
+                    and "node" not in str(trial).lower()
             )
         ]
-        coins = [self.get_coins(trial) for trial in forager_trials]
+        coins = [len(trial.answer["coins_foraged"])  for trial in forager_trials]
         n_coins = sum(coins)
         seed["n_coins"] = n_coins
 
@@ -53,16 +54,3 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
         coordinator = [trial for trial in trials if 'coordinator' in str(trial).lower()]
         assert len(coordinator) == 1
         return coordinator[0]
-
-    def get_coins(self, trial) -> int:
-        answer = self.get_answers_from_trial(trial)
-        coins = answer["coins_foraged"]
-        return len(coins)
-
-    def get_answers_from_trial(self, trial: ImitationChainTrial) -> Dict[str, Any]:
-        """Extract the answers from the given trial"""
-        assert isinstance(trial, ImitationChainTrial), f"Error: expected ImitationChainTrial, got {type(trial)}"
-        # Extract the answer
-        answer = self.get_target_answer(trial)
-        assert isinstance(answer, dict), f"Error: expected dict, got {type(answer)} --- {answer=}"
-        return answer

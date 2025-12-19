@@ -91,7 +91,7 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 "well-being",
                 Prompt(Markup(WELL_BEING_TEXT)),
                 SliderControl(
-                    start_value=0.0,
+                    start_value=0.5,
                     min_value=0.0,
                     max_value=1,
                     n_steps=100,

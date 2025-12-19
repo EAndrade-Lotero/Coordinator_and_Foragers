@@ -41,7 +41,7 @@ def get_trial_maker():
                 "world_path": world_path,
                 "n_coins": INITIAL_WEALTH,
             }
-        ) for world_path in WORLD_PATHS[:1]
+        ) for world_path in WORLD_PATHS
     ]
 
     return CreateAndRateTrialMaker(

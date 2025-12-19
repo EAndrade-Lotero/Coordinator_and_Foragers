@@ -32,11 +32,11 @@ class SliderSettingPage(ModularPage):
         assert(dimension in ["overhead", "wages", "prerogative"]), f"Invalid dimension: {dimension}. Expected 'overhead', 'wages' or 'prerogative'"
 
         super().__init__(
-            dimension,
-            Prompt(
+            label=dimension,
+            prompt=Prompt(
                 text=Markup(SLIDER_SETTING_TEXT(dimension)),
             ),
-            SliderControl(
+            control=SliderControl(
                 start_value=start_value,
                 min_value=0,
                 max_value=1,

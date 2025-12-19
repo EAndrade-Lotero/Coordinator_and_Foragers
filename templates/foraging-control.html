@@ -267,7 +267,7 @@
 
             // Decrement fuel
             {#fuel = Math.max(0, fuel - gears[gearIdx].tiles);   // cost = tiles moved#}
-            fuel = Math.max(0, fuel - 1);
+            fuel = Math.max(0, fuel - 0.25);
         }
 
         window.addEventListener("keydown", (e) => {

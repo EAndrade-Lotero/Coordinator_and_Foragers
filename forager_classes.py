@@ -15,6 +15,7 @@ from psynet.utils import get_logger
 from psynet.modular_page import (
     ModularPage,
     Prompt,
+    SliderControl,
     PushButtonControl,
 )
 from psynet.trial.create_and_rate import RateTrialMixin
@@ -28,6 +29,7 @@ from .text_variables import (
     FORAGER_INSTRUCTIONS,
     FORAGING_PAGE,
     SCORE_TEXT,
+    WELL_BEING_TEXT,
 )
 
 logger = get_logger()
@@ -78,10 +80,22 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                 f"You have collected 0 coins!",
                 time_estimate=self.time_estimate,
             ),
-            # InfoPage(
-            #     Markup(self.get_reward_text(participant)),
-            #     time_estimate=self.time_estimate,
-            # ),
+            InfoPage(
+                Markup(self.get_reward_text(participant)),
+                time_estimate=self.time_estimate,
+            ),
+            # Asks coordinator well-being
+            ModularPage(
+                "well-being",
+                Prompt(Markup(WELL_BEING_TEXT)),
+                SliderControl(
+                    start_value=0.5,
+                    min_value=0.0,
+                    max_value=1,
+                    n_steps=100,
+                ),
+                time_estimate=self.time_estimate,
+            ),
         ]
 
         return list_of_pages
@@ -244,19 +258,35 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
             return 0
 
     def get_reward_text(self, participant) -> Markup:
-        n_coins = participant.current_trial.definition["n_coins"]
-        sliders = participant.current_trial.definition["sliders"]
-        text = RewardProcessing.get_reward(
-            n_coins=n_coins,
-            sliders=sliders,
-            trial_type="forager",
-        )
+        try:
+            n_coins = participant.current_trial.definition["n_coins"]
+        except:
+            logger.info(f"Could not get number of coins")
+            n_coins = 10
+        try:
+            sliders = participant.current_trial.definition["sliders"]
+        except:
+            sliders = {
+                "overhead":1,
+                "wages":1,
+                "prerogative":1,
+            }
+            logger.info(f"Could not get sliders")
+        try:
+            text = RewardProcessing.get_reward(
+                n_coins=n_coins,
+                sliders=sliders,
+                trial_type=f"forager-{self.get_forager_id(participant)}",
+            )
+        except:
+            text = f"Error: Could not get reward for forager-{self.get_forager_id(participant)}"
+            logger.info(text)
         text = SCORE_TEXT(text)
         return Markup(text)
 
     def format_answer(self, raw_answer, **kwargs) -> Union[float, str]:
         try:
-            # answer = raw_answer["rate_trial"]
+            # answer = raw_answer["well-being"]
             # return answer
             return raw_answer
         except (ValueError, AssertionError) as e:
