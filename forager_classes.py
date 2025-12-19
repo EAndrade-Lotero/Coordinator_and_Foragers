@@ -20,6 +20,7 @@ from psynet.modular_page import (
 )
 from psynet.trial.create_and_rate import RateTrialMixin
 from psynet.trial.imitation_chain import ImitationChainTrial
+from psynet.timeline import CodeBlock
 
 from .custom_node import CustomNode
 from .custom_front_end import ForagingControl
@@ -53,6 +54,8 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
     def show_trial(self, experiment, participant):
         assert self.trial_maker.target_selection_method == "all"
 
+        self.set_start_value_n_coins(participant)
+
         list_of_pages = [
             ModularPage(
                 "forager_id",
@@ -64,6 +67,9 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                 ),
                 time_estimate=self.time_estimate,
             ),
+            # CodeBlock(
+            #     lambda participant: self.set_start_value_n_coins(participant),
+            # ),
             ModularPage(
                 "coins_foraged",
                 Prompt(FORAGING_PAGE),
@@ -75,9 +81,11 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                 ),
                 time_estimate=self.time_estimate,
             ),
+            CodeBlock(
+                lambda participant: self.set_n_coins(participant),
+            ),
             InfoPage(
-                # f"You have collected {self.get_num_coins(participant)} coins!"
-                f"You have collected 0 coins!",
+                content=f"You have collected {self.get_n_coins(participant)} coins!",
                 time_estimate=self.time_estimate,
             ),
             InfoPage(
@@ -258,20 +266,8 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
             return 0
 
     def get_reward_text(self, participant) -> Markup:
-        try:
-            n_coins = participant.current_trial.definition["n_coins"]
-        except:
-            logger.info(f"Could not get number of coins")
-            n_coins = 10
-        try:
-            sliders = participant.current_trial.definition["sliders"]
-        except:
-            sliders = {
-                "overhead":1,
-                "wages":1,
-                "prerogative":1,
-            }
-            logger.info(f"Could not get sliders")
+        n_coins = participant.current_trial.definition["n_coins"]
+        sliders = participant.current_trial.definition["sliders"]
         try:
             text = RewardProcessing.get_reward(
                 n_coins=n_coins,
@@ -283,6 +279,35 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
             logger.info(text)
         text = SCORE_TEXT(text)
         return Markup(text)
+
+    def set_start_value_n_coins(self, participant) -> float:
+        default_value = 0
+        try:
+            n_coins = participant.current_trial.vars["n_coins"]
+        except:
+            n_coins = default_value
+            participant.current_trial.vars["n_coins"] = default_value
+        return n_coins
+
+    def set_n_coins(self, participant):
+        last_answer = participant.answer_accumulators[-1]
+        assert isinstance(last_answer, dict)
+        assert "coins_foraged" in last_answer.keys()
+        coins = last_answer["coins_foraged"]
+        n_coins = len(coins)
+        logger.info(f"Forager {self.get_forager_id(participant)} collected {n_coins}.")
+        participant.current_trial.vars["n_coins"] = n_coins
+
+    def get_n_coins(self, participant) -> float:
+        try:
+            n_coins = participant.current_trial.vars["n_coins"]
+            n_coins = int(n_coins)
+            logger.info(f"Ok, I see {n_coins} coins.")
+            return n_coins
+        except:
+            logger.exception("Something went wrong. Current trial doesn't have n_coins.")
+            raise KeyError
+
 
     def format_answer(self, raw_answer, **kwargs) -> Union[float, str]:
         try:

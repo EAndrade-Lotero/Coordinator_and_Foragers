@@ -430,7 +430,7 @@ class WealthTracker:
     def calculate_coordinator_reward(self, sliders: Dict[str, float]) -> None:
         # Get slider parameters
         overhead = sliders["overhead"]
-        assert isinstance(overhead, float), f"Error: Expected overhead of type float, got {type(overhead)}"
+        assert isinstance(overhead, float), f"Error: Expected overhead of type float, got {type(overhead)} --- {overhead=}"
         self.coordinator_wealth = overhead * self.n_coins
 
     def get_coordinator_wealth(self) -> float:
