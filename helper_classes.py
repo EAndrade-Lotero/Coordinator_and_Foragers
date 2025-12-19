@@ -370,7 +370,7 @@ class World:
                 terrain[y, x] = 255
         return terrain.tolist()
 
-    def generate_rgba_array(self, b=180, a_even=255, a_odd=140) -> List[float]:
+    def generate_rgba_array(self, a_even=255, a_odd=140) -> List[float]:
         coords = self.coin_positions()
         xs, ys = zip(*coords)
         rows = np.array(ys)
@@ -403,14 +403,14 @@ class WealthTracker:
         self.coordinator_wealth: Union[float, None] = None
         self.foragers_wealth: Union[List[float], None] = None
 
-    def initialize(self, sliders: Dict[str, float]) -> None:
+    def initialize(self, sliders: Dict[str, float], investment:float) -> None:
 
         assert(self.n_coins is not None)
         assert(isinstance(self.n_coins, int))
         print("Number of coins: ", self.n_coins)
 
         # Calculate coordinator's wealth
-        self.calculate_coordinator_reward(sliders)
+        self.calculate_coordinator_reward(sliders, investment)
 
         remaining = self.n_coins - self.coordinator_wealth
         print("Remaining after overhead:", remaining)
@@ -429,13 +429,13 @@ class WealthTracker:
 
         logger.info(f"Foragers wealth: {self.foragers_wealth}")
 
-    def calculate_coordinator_reward(self, sliders: Dict[str, float]) -> None:
+    def calculate_coordinator_reward(self, sliders: Dict[str, float], investment:float) -> None:
         # Get slider parameters
         overhead = sliders["overhead"]
         if isinstance(overhead, tuple):
             overhead = overhead[0]
         assert isinstance(overhead, float), f"Error: Expected overhead of type float, got {type(overhead)} --- {overhead=}"
-        self.coordinator_wealth = overhead * self.n_coins
+        self.coordinator_wealth = overhead * self.n_coins + int(10 * (1 - investment))
 
     def get_coordinator_wealth(self) -> float:
         assert(self.coordinator_wealth is not None), "Coordinator wealth is not set yet. Run update() first."
@@ -453,13 +453,14 @@ class RewardProcessing:
     def get_reward(
         n_coins: int,
         sliders: Any,
+        investment: float,
         trial_type: str
     ) -> str:
         trial_types = ["coordinator"] + [f"forager-{i}" for i in range(NUM_FORAGERS)]
         assert(trial_type in trial_types), f"Invalid trial type. Expected one of {trial_types} but got {trial_type}."
 
         accumulated_wealth = WealthTracker(n_coins)
-        accumulated_wealth.initialize(sliders)
+        accumulated_wealth.initialize(sliders, investment)
 
         if trial_type == "coordinator":
             score = accumulated_wealth.get_coordinator_wealth()

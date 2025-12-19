@@ -156,11 +156,15 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
         return value
 
     def get_reward_text(self, participant) -> Markup:
+        investment = self.get_investment(participant)
+
         n_coins = participant.current_trial.definition["n_coins"]
         sliders = participant.current_trial.definition["sliders"]
+
         text = RewardProcessing.get_reward(
             n_coins=n_coins,
             sliders=sliders,
+            investment=investment,
             trial_type="coordinator",
         )
         text = SCORE_TEXT(text)

@@ -268,12 +268,17 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
             return 0
 
     def get_reward_text(self, participant) -> Markup:
+        coordinator_answer = self.get_answer_from_coordinator(participant)
+        investment = coordinator_answer["investment"]
+
         n_coins = participant.current_trial.definition["n_coins"]
         sliders = participant.current_trial.definition["sliders"]
+
         try:
             text = RewardProcessing.get_reward(
                 n_coins=n_coins,
                 sliders=sliders,
+                investment=investment,
                 trial_type=f"forager-{self.get_forager_id(participant)}",
             )
         except:
