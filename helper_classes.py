@@ -272,7 +272,6 @@ class World:
 
         # Canvas sized roughly to grid, independent of DPI
         fig, ax = plt.subplots(
-            # figsize=(int(self.width / 10), int(self.height / 10)),
             figsize=(1,1),
             dpi=100
         )
@@ -322,7 +321,7 @@ class World:
         mean: Iterable[float],
         cov: Iterable[Iterable[float]],
         n: int,
-    ) -> List[Tuple[float, float]] | NDArray[np.float64]:
+    ) -> List[tuple] | NDArray[np.float64]:
         """
         Sample n points from a 2D (bivariate) normal distribution.
 

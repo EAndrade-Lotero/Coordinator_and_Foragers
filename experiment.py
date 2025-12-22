@@ -2,13 +2,15 @@
 ##########################################################################################
 # Imports
 ##########################################################################################
+import json
 from markupsafe import Markup
 
+from psynet.consent import NoConsent # <= Don't use it but include the consent
 import psynet.experiment
 from psynet.page import InfoPage
 from psynet.timeline import Timeline
 from psynet.utils import get_logger
-from sqlalchemy.testing import assert_warns
+# from sqlalchemy.testing import assert_warns
 
 from .coordinator_classes import CoordinatorTrial
 from .forager_classes import ForagerTrial
@@ -72,14 +74,45 @@ def get_trial_maker():
         max_nodes_per_chain=10,
     )
 
+def get_prolific_settings():
+    with open("qualification_prolific_en.json", "r") as f:
+        qualification = json.dumps(json.load(f))
+    return {
+        "recruiter": "prolific",
+        "base_payment": 4.5,
+        "prolific_estimated_completion_minutes": 30,
+        "prolific_recruitment_config": qualification,
+        "auto_recruit": False,
+        "wage_per_hour": 0,
+        "currency": "£",
+        "show_reward": False,
+    }
+
 class Exp(psynet.experiment.Experiment):
     label = "Coordinators and Foragers Experiment"
     initial_recruitment_size = 1
 
+    config = {
+        "recruiter": "hotair",
+        "wage_per_hour": 9,
+        "currency": "£",
+        # **get_prolific_settings(),
+        "title": "Coordinator and foragers",
+        "description": "This is the experiment",
+        'initial_recruitment_size': 1,
+        "auto_recruit": False,
+        "show_reward": False,
+    }
+
     timeline = Timeline(
+        NoConsent(),
+        # General instructions page
         InfoPage(
             Markup(WELCOME_TEXT),
-            time_estimate=5
+            time_estimate=120
         ),
+        # Start the game with trial maker
         get_trial_maker()
     )
+
+
