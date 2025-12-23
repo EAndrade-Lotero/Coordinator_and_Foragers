@@ -165,8 +165,8 @@ class World:
             self.grid[coords_y, coords_x] = 1
 
         # Add random coins
-        coins = self.create_random_coins(0.01)
-        self.place_given_coins(coins)
+        # coins = self.create_random_coins(0.01)
+        # self.place_given_coins(coins)
 
     def get_centroids(self) -> List[Tuple[int, int]]:
         """Return the centroids of coins placed."""
@@ -272,7 +272,7 @@ class World:
 
         # Canvas sized roughly to grid, independent of DPI
         fig, ax = plt.subplots(
-            figsize=(1,1),
+            figsize=(8, 5),
             dpi=100
         )
 

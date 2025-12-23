@@ -4,6 +4,7 @@
 ##########################################################################################
 import json
 from markupsafe import Markup
+from consent_science_of_learning import consent_cococo_science_of_learning
 
 from psynet.consent import NoConsent # <= Don't use it but include the consent
 import psynet.experiment
@@ -83,9 +84,10 @@ def get_prolific_settings():
         "prolific_estimated_completion_minutes": 30,
         "prolific_recruitment_config": qualification,
         "auto_recruit": False,
-        "wage_per_hour": 0,
+        "wage_per_hour": 9,
         "currency": "£",
         "show_reward": False,
+        "show_progress_bar": True,
     }
 
 class Exp(psynet.experiment.Experiment):
@@ -101,7 +103,8 @@ class Exp(psynet.experiment.Experiment):
         "description": "This is the experiment",
         'initial_recruitment_size': 1,
         "auto_recruit": False,
-        "show_reward": False,
+        "show_reward": True,
+        "show_progress_bar": True,
     }
 
     timeline = Timeline(

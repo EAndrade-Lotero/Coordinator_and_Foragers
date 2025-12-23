@@ -67,9 +67,6 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                 ),
                 time_estimate=self.time_estimate,
             ),
-            # CodeBlock(
-            #     lambda participant: self.set_start_value_n_coins(participant),
-            # ),
             ModularPage(
                 "coins_foraged",
                 Prompt(FORAGING_PAGE),
@@ -80,6 +77,13 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                     context=self.context,
                 ),
                 time_estimate=self.time_estimate,
+                events={
+                    "automaticallyContinue": Event(
+                        is_triggered_by="trialStart",
+                        delay=10.0,  # Wait 10 seconds after started
+                        js="psynet.submitResponse();",
+                    ),
+                }
             ),
             CodeBlock(
                 lambda participant: self.set_n_coins(participant),

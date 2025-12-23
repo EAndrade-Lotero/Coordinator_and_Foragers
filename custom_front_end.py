@@ -85,11 +85,11 @@ class ForagingControl(Control):
         self.pos_x = position[0]
         self.pos_y = position[1]
         # Create world from json
-        self.world = World.generate_from_coins(coins)
+        world = World.generate_from_coins(coins)
         # logger.info(f"Coins in world: {self.world.coin_positions()}")
-        self.map = self.world.generate_terrain()
+        self.map = world.generate_terrain()
         self.forager_url = context["forager_url"]
-        self.map_url = self.world.map_path
+        self.map_url = world.map_path
         self.num_foragers = NUM_FORAGERS
         assert 0 <= max_gear <=2 and isinstance(max_gear, int)
         self.max_gear = max_gear

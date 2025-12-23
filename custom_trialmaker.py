@@ -18,6 +18,7 @@ logger = get_logger()
 
 class CreateAndRateTrialMaker(CreateAndRateTrialMakerMixin, ImitationChainTrialMaker):
     response_timeout_sec = 300 # (200% of the estimated time)
+    check_timeout_interval_sec = 300
     allow_revisiting_networks_in_across_chains = False
 
     def custom_network_filter(self, candidates, participant) -> List[Any]:
