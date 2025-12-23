@@ -1,0 +1,308 @@
+{% macro foraging_area(config) %}
+
+  <style>
+    :root { --bg:#0b0f14; --panel:#111826; --text:#e6edf3; --muted:#93a4b5; }
+    html, body { height: 85%; margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    .wrap {
+      height: 100%;
+      display: grid;
+      grid-template-columns: auto 240px;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    canvas {
+      background: #000;
+      border-radius: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .title { display:flex; align-items:center; gap:10px; font-weight: 700; letter-spacing:.2px; margin-bottom: 10px; }
+    .hint { color: var(--muted); font-size: 13px; line-height: 1.35; margin: 10px 0 14px; }
+    .gearBox {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .track {
+      width: 10px;
+      height: 120px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      position: relative;
+      margin: 0 auto;
+    }
+    .thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.9);
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 6px 16px rgba(0,0,0,.35);
+    }
+    .gears { display: grid; gap: 10px; font-size: 14px; }
+    .g {
+      display:flex; justify-content: space-between; align-items:center;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.06);
+      background: rgba(255,255,255,.02);
+    }
+    .badge { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .row { margin-top: 14px; font-size: 13px; color: var(--muted); }
+    .kbd { display:inline-block; padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: var(--text); font-size: 12px; }
+    .g.disabled {
+      opacity: 0.35;
+      filter: grayscale(1);
+      cursor: not-allowed;
+    }
+    .g.disabled .badge { color: rgba(147,164,181,0.7); }
+    .scene { display: flex; align-items: center; gap: 14px; }
+
+    .fuel { width: 72px; display: grid; gap: 8px; justify-items: center; }
+    .fuelFrame {
+      width: 22px;
+      height: 440px;          /* match canvas CSS height */
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+      position: relative;
+      overflow: hidden;
+    }
+    .fuelFill {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 100%;
+      background: #f2dd83; /* keep it simple; you can color later */
+    }
+    .fuelLabel { font-size: 12px; color: var(--muted); text-align: center; }
+  </style>
+    <body>
+  <div class="wrap">
+    <div class="scene">
+      <div class="fuel" aria-label="Fuel gauge">
+        <div class="fuelFrame">
+          <div id="fuelFill" class="fuelFill"></div>
+        </div>
+        <div id="fuelLabel" class="fuelLabel">Fuel: 100%</div>
+      </div>
+
+      <canvas id="cv" width="440" height="440"></canvas>
+    </div>
+
+    <aside class="panel">
+      <div class="title">Movement Info</div>
+      <div class="hint">
+        Move with <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span>.
+          <br>
+        Change gear with <span class="kbd">↑</span> / <span class="kbd">↓</span>.
+      </div>
+
+      <div class="gearBox">
+        <div class="track" aria-hidden="true">
+          <div id="thumb" class="thumb"></div>
+        </div>
+        <div class="gears">
+          <div id="g1" class="g"><span>Gear 3 (fast)</span><span class="badge" id="b1"></span></div>
+          <div id="g2" class="g"><span>Gear 2</span><span class="badge" id="b2"></span></div>
+          <div id="g3" class="g"><span>Gear 1 (slow)</span><span class="badge" id="b3"></span></div>
+        </div>
+      </div>
+
+      <div class="row" id="pos"></div>
+    </aside>
+  </div>
+
+  <script>
+        let fuel = 100;          // 0..100
+        const fuelFill = document.getElementById("fuelFill");
+        const fuelLabel = document.getElementById("fuelLabel");
+
+        let world = {{ config.map }};
+        const WORLD_H = world.length;
+        const WORLD_W = world[0].length;
+        const VIEW = 11;
+        const CENTER = Math.floor(VIEW / 2); // 5
+
+        const canvas = document.getElementById("cv");
+        const ctx = canvas.getContext("2d");
+
+        // HiDPI crispness
+        const cssSize = 440;
+        const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+        canvas.style.width = cssSize + "px";
+        canvas.style.height = cssSize + "px";
+        canvas.width = Math.floor(cssSize * dpr);
+        canvas.height = Math.floor(cssSize * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const cell = cssSize / VIEW;
+
+        // Agent position in world coords
+        let ax = {{ config.pos_x }};
+        let ay = {{ config.pos_y }};
+        let coins_foraged = [];
+
+        // Gear = number of tiles moved per keypress
+        let max_gear = {{ config.max_gear }};
+        const gears = [
+          { name: "Gear 1", tiles: 1, enabled: {{ config.enabled[2] }}  },
+          { name: "Gear 2", tiles: 2, enabled: {{ config.enabled[1] }} },
+          { name: "Gear 3", tiles: 4, enabled: {{ config.enabled[0] }}  }
+        ];
+        let gearIdx = 0;
+
+        const thumb = document.getElementById("thumb");
+        const gEls = [document.getElementById("g1"), document.getElementById("g2"), document.getElementById("g3")];
+        const bEls = [document.getElementById("b1"), document.getElementById("b2"), document.getElementById("b3")];
+        const posEl = document.getElementById("pos");
+
+        function updateGearUI() {
+            gEls.forEach((el, i) => {
+                el.classList.toggle("active", i === gearIdx);
+                el.classList.toggle("disabled", !gears[i].enabled);
+            });
+
+            bEls[2].textContent = `${gears[0].tiles} tile/press`;
+            bEls[1].textContent = `${gears[1].tiles} tiles/press`;
+            bEls[0].textContent = `${gears[2].tiles} tiles/press`;
+
+            // thumb: 1 bottom, 3 top
+            const yMap = [102, 51, 0];
+            thumb.style.top = yMap[gearIdx] + "px";
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, cssSize, cssSize);
+
+            for (let vy = 0; vy < VIEW; vy++) {
+              for (let vx = 0; vx < VIEW; vx++) {
+                const wx = ax + (vx - CENTER);
+                const wy = ay + (vy - CENTER);
+
+                let col = "#0a0d12";
+                if (wx >= 0 && wx < WORLD_W && wy >= 0 && wy < WORLD_H) {
+                    const v = world[wy][wx];
+                    col = `rgb(${v}, ${v}, ${v})`;
+                }
+
+                const px = vx * cell;
+                const py = vy * cell;
+
+                ctx.fillStyle = col;
+                ctx.fillRect(px, py, cell, cell);
+
+                ctx.strokeStyle = "rgba(255,255,255,0.08)";
+                ctx.strokeRect(px + 0.5, py + 0.5, cell - 1, cell - 1);
+              }
+            }
+
+            // Draw centered agent (fixed on screen)
+            const cx = (CENTER + 0.5) * cell;
+            const cy = (CENTER + 0.5) * cell;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, cell * 0.22, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(255,255,255,0.95)";
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(cx - cell * 0.35, cy);
+            ctx.lineTo(cx + cell * 0.35, cy);
+            ctx.moveTo(cx, cy - cell * 0.35);
+            ctx.lineTo(cx, cy + cell * 0.35);
+            ctx.strokeStyle = "rgba(0,0,0,0.55)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            posEl.textContent = `World position: (${ax}, ${ay}) • Gear: ${gearIdx + 1}`;
+
+            // Draw fuel gauge
+            fuelFill.style.height = `${fuel}%`;
+            fuelLabel.textContent = `Fuel: ${fuel}%`;
+        }
+
+        function move(dx, dy) {
+            if (fuel <= 0) return;
+
+            const k = gears[gearIdx].tiles;
+
+            // no diagonals: if both set, prefer vertical
+            if (dx !== 0 && dy !== 0) dx = 0;
+
+            ax = Math.max(0, Math.min(WORLD_W - 1, ax + dx * k));
+            ay = Math.max(0, Math.min(WORLD_H - 1, ay + dy * k));
+
+            // Check if there is a coin to be foraged
+            if (world[ay][ax] === 0) {
+                // Check if velocity is 1
+                if (gearIdx === 0) {
+                    coins_foraged.push([ax, ay]);
+                    world[ay][ax] = 240;
+                    console.log('Coin collected at position:', ax, ay);
+                } else {
+                    console.log('Moving too fast to collect coin!');
+                }
+            }
+            console.log('Coins foraged so far:', coins_foraged);
+
+            // Render world
+            render();
+
+            // Decrement fuel
+            {#fuel = Math.max(0, fuel - gears[gearIdx].tiles);   // cost = tiles moved#}
+            fuel = Math.max(0, fuel - 0.25);
+        }
+
+        window.addEventListener("keydown", (e) => {
+        // prevent page scroll with arrows / space
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
+
+        const k = e.key.toLowerCase();
+
+        if (k === "w") move(0, -1);
+        else if (k === "s") move(0, 1);
+        else if (k === "a") move(-1, 0);
+        else if (k === "d") move(1, 0);
+        else if (e.key === "ArrowUp") {
+            if (gearIdx >= max_gear) return;
+            gearIdx = Math.min(2, gearIdx + 1);
+            updateGearUI();
+            render();
+        } else if (e.key === "ArrowDown") {
+          gearIdx = Math.min(max_gear, Math.max(0, gearIdx - 1));
+          updateGearUI();
+          render();
+        }
+        }, { passive: false });
+
+        updateGearUI();
+        render();
+
+
+        /////////////////////////////////////////////////////
+        // Function to stage the response for PsyNet
+        /////////////////////////////////////////////////////
+        psynet.stageResponse = function() {
+              psynet.response.staged.rawAnswer = coins_foraged;
+        }
+
+    </script>
+
+{% endmacro %}

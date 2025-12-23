@@ -2,16 +2,18 @@
 ##########################################################################################
 # Imports
 ##########################################################################################
-from typing import Union
+from typing import Union, Optional
 
+from markupsafe import Markup
 from psynet.utils import get_logger
 from psynet.timeline import FailedValidation
-
 from psynet.modular_page import (
     ModularPage,
     Prompt,
     SliderControl,
 )
+
+from .text_variables import SLIDER_SETTING_TEXT
 
 logger = get_logger()
 
@@ -25,27 +27,20 @@ class SliderSettingPage(ModularPage):
             dimension: str,
             start_value: float,
             time_estimate: float,
+            n_steps: Optional[int] = 100,
     ) -> None:
         assert(dimension in ["overhead", "wages", "prerogative"]), f"Invalid dimension: {dimension}. Expected 'overhead', 'wages' or 'prerogative'"
 
-        information_text = f'''
-        You can modify the parameters of the social contract established so far.
-        This is the place to modify the {dimension} parameter.
-        HERE THE EXPLANATION.
-        The slider below displays the current level of {dimension}. Please move it to match your desired level of {dimension}.
-        '''
-        assert(dimension in ["overhead", "wages", "prerogative"]), f"Invalid dimension: {dimension}. Expected 'overhead', 'wages-commission', 'prerogative'."
-
         super().__init__(
-            dimension,
-            Prompt(
-                text=information_text,
+            label=dimension,
+            prompt=Prompt(
+                text=Markup(SLIDER_SETTING_TEXT(dimension)),
             ),
-            SliderControl(
+            control=SliderControl(
                 start_value=start_value,
                 min_value=0,
                 max_value=1,
-                n_steps=100,
+                n_steps=n_steps,
             ),
             time_estimate=time_estimate,
             save_answer=dimension

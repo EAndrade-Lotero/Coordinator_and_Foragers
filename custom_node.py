@@ -7,6 +7,7 @@ from typing import Dict, Any
 from psynet.trial import ChainNode
 from psynet.utils import get_logger
 from psynet.trial.create_and_rate import CreateAndRateNodeMixin
+from psynet.trial.imitation_chain import ImitationChainTrial
 
 logger = get_logger()
 
@@ -28,10 +29,25 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
 
         # Get new sliders settings
         coordinator = self.get_coordinator(trials)
-        overhead = coordinator.answer["overhead"]
 
-        # Beget new setting
-        seed["overhead"] = overhead,
+        # Beget sliders settings
+        for parameter in ["overhead", "wages", "prerogative"]:
+            seed["sliders"][parameter] = coordinator.answer[parameter],
+
+        # Beget number of coins
+        forager_trials = [
+            trial for trial in trials
+            if (
+                    trial.finalized == True
+                    and trial.failed == False
+                    and "forager" in str(trial).lower()
+                    and "node" not in str(trial).lower()
+            )
+        ]
+        coins = [len(trial.answer["coins_foraged"])  for trial in forager_trials]
+        n_coins = sum(coins)
+        seed["n_coins"] = n_coins
+
         return seed
 
     def get_coordinator(self, trials):

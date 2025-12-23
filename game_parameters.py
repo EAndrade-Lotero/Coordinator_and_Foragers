@@ -4,26 +4,31 @@ import numpy as np
 NUM_FORAGERS = 2
 POWER_ROLE = "coordinator"
 
-NUM_CENTROIDS = 2
+WORLD_WIDTH = 250
+WORLD_HEIGHT = 200
+NUM_CENTROIDS = 13
 NUM_COINS = 100
 DISPERSION = 10
-INITIAL_WEALTH = 100
-LIST_OF_DISTRIBUTIONS = ["linear"]
-INITIAL_POSITIONS = ["A", "B"]
 
-STARTING_OVERHEAD = 0.5
-STARTING_PREROGATIVE = 0.5
-STARTING_WAGES = 0.5
+INITIAL_WEALTH = 700
+INITIAL_POSITIONS = [(0,0), (WORLD_WIDTH, WORLD_HEIGHT)]
 
+STARTING_SLIDERS = {
+    "overhead":0.5,
+    "wages":0.5,
+    "prerogative":0.5
+}
 
 NUM_TRIALS_PER_PARTICIPANT = 2
 MAX_NODES_PER_CHAIN = 10
 
+WORLD_PATHS = [
+    "static/assets/images/map1.json",
+]
+
 IMAGE_PATHS = {
-    "img_url": "static/positioning.png",
-    "map_url": "static/map.png",
-    "coin_url": "static/coin.png",
-    "forager_url": "static/forager.png",
+    "coin_url": "static/assets/images/coin.png",
+    "forager_url": "static/assets/images/forager.png",
 }
 
 RNG = np.random.default_rng(42)
