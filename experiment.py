@@ -4,7 +4,6 @@
 ##########################################################################################
 import json
 from markupsafe import Markup
-from consent_science_of_learning import consent_cococo_science_of_learning
 
 from psynet.consent import NoConsent # <= Don't use it but include the consent
 import psynet.experiment
