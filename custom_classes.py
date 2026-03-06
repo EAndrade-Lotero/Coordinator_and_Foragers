@@ -4,6 +4,7 @@ import ast
 ##########################################################################################
 # Imports
 ##########################################################################################
+from markupsafe import Markup
 from typing import (
     List, Union, Dict,
     Any, Tuple, Optional
@@ -32,6 +33,8 @@ from .game_parameters import (
     COORDINATOR_INITIAL_ENDOWMENT,
     NUM_ROUNDS,
 )
+from .custom_front_end import CustomSliderControl
+from .text_variables import MAKE_INVESTMENT
 from .variable_handler import VariableHandler
 
 variable_handler = VariableHandler(
@@ -54,11 +57,12 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
 
     def show_trial(self, experiment, participant):
 
-        variable_handler.set_value(participant, "budget_dict", {0: COORDINATOR_INITIAL_ENDOWMENT})
+        variable_handler.set_value(participant, "budget", COORDINATOR_INITIAL_ENDOWMENT)
+        variable_handler.set_value(participant, "investment", 0)
 
         list_of_pages = [
             InfoPage(
-                "This is going to be the instructions for the COORDINATOR.",
+                "This is going to be the instructions for the MANAGER.",
                 time_estimate=1,
             ),
             # MAIN LOOP IS HERE
@@ -66,25 +70,34 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 label="test_rounds",
                 iterate_over=range(NUM_ROUNDS),
                 logic=lambda number: join(
+                    # Make investment
                     ModularPage(
-                        label="answer",
-                        prompt=Prompt(f"This is round {number}"),
-                        control=PushButtonControl(
-                            choices=[
-                                f"{number}: {variable_handler.get_value(participant, 'budget_dict')}"
-                            ],
-                            labels=["Next"]
+                        "investment_round",
+                        Prompt(Markup(MAKE_INVESTMENT)),
+                        CustomSliderControl(
+                            start_value=0,
+                            min_value=0,
+                            max_value=variable_handler.get_value(participant, "budget"),
+                            n_steps=variable_handler.get_value(participant, "budget"),
+                            right_label="coins"
                         ),
                         time_estimate=5,
                     ),
                     CodeBlock(
-                        lambda participant: variable_handler.set_dictionary_value(
+                        lambda participant: variable_handler.set_value(
                             participant=participant,
-                            dictionary_name="budget_dict",
-                            key=number,
-                            value=number+1,
+                            variable="investment",
+                            value=variable_handler.get_value_from_last_answer(
+                                participant=participant,
+                                page_label="investment_round"
+                            ),
                         )
-                    )
+                    ),
+                    InfoPage(
+                      f"Manager invested {variable_handler.get_value(participant, 'investment')}"
+                      + f"{variable_handler.get_value_from_last_answer(participant, 'investment_round')}",
+                      time_estimate=5
+                    ),
                 ),
                 time_estimate_per_iteration=5,
             ),

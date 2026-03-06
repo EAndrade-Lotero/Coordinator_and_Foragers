@@ -37,6 +37,16 @@ class VariableHandler:
             logger.info("Value added =>>")
             logger.info(f"{dictionary}")
 
+    def get_dictionary_value(self, participant, dictionary_name, key):
+        dictionary = self.get_value(participant, dictionary_name)
+        if self.debug:
+            logger.info(f"VariableHandler is using dictionary: {dictionary_name}")
+            logger.info(f"{dictionary}")
+        value = dictionary[key]
+        if self.debug:
+            logger.info(f"Value retrieved =>> {value}")
+        return value
+
     def get_from_var(self, participant, variable: str):
         data = self.get_data_at_level(participant)
         if data.has(variable):
