@@ -37,11 +37,8 @@ START_NODES = [
         seed={
             "sliders": {
                 "overhead": overhead,
-                "wages": STARTING_SLIDERS["wages"],
-                "prerogative": STARTING_SLIDERS["prerogative"],
             },
             "world_path": world_path,
-            "n_coins": INITIAL_WEALTH,
         },
         participant_group=participant_group
     )

@@ -2,8 +2,8 @@
 import numpy as np
 
 NUM_FORAGERS = 2
-NUM_ROUNDS = 2
-NUMBER_OF_TRIALS = 2
+NUM_ROUNDS = 3
+NUMBER_OF_TRIALS = 1
 MAX_NODES_PER_CHAIN = 2
 
 WORLD_WIDTH = 80
@@ -29,38 +29,32 @@ INITIAL_POSITIONS = INITIAL_POSITIONS[:NUM_FORAGERS]
 COORDINATOR_INITIAL_ENDOWMENT = 10
 FORAGER_INITIAL_ENDOWMENT = 10
 STARTING_SLIDERS = {
-    "overhead":0.05,
-    "wages":0,
-    "prerogative":2
+    "overhead": 0.05,
+    "wages": 0,
+    "prerogative": 2
 }
 
 # ----------------------------------------------
 # These parameters determine the different seeds
 # ----------------------------------------------
-OVERHEADS = [0.05, 0.5, 0.95]
-POWER_ROLES = ["coordinator", "forager"]
-WORLD_PATHS = [
-    "static/map1.json",
-    "static/map2.json",
-    # "static/map1.json",
-    "static/map3.json",
-    # "static/map2.json",
-]
-# OVERHEADS = [0.05]
-# POWER_ROLES = ["forager"]
+# OVERHEADS = [0.05, 0.5, 0.95]
+# POWER_ROLES = ["coordinator", "forager"]
 # WORLD_PATHS = [
-#     "static/map1.json",
-#     # "static/map2.json",
-#     # "static/map1.json",
-#     # "static/map3.json",
-#     # "static/map2.json",
+#     f"static/map{i}.json" for i in range(16)
 # ]
+OVERHEADS = [0.05]
+POWER_ROLES = ["forager"]
+WORLD_PATHS = [
+    f"static/map{i}.json" for i in range(1)
+]
 # ----------------------------------------------
 
 FUEL_PER_MOVE = 1
 MAX_STEPS = int(100 / FUEL_PER_MOVE)
 MAX_MOVEMENT = lambda reach: int(reach * MAX_STEPS)
 # COLLECTION_CHANCE = lambda reach: 0.4 + 1 / (2 * reach)
+
+
 def coin_collection_chance(reach:int):
     if reach == 1:
         return 1.0

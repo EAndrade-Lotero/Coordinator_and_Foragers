@@ -13,11 +13,29 @@ class VariableHandler:
         self.level = level
         self.use_vars = use_vars
 
+    def set_value(self, participant, variable, value) -> None:
+        _ = self.get_value(participant, variable)
+        data = self.get_data_at_level(participant)
+        if self.use_vars:
+            data[variable] = value
+        else:
+            setattr(data, variable, value)
+
     def get_value(self, participant, variable: str):
         if self.use_vars:
             return self.get_from_vars(participant, variable)
         else:
             return self.get_from_var(participant, variable)
+
+    def set_dictionary_value(self, participant, dictionary_name, key, value):
+        dictionary = self.get_value(participant, dictionary_name)
+        if self.debug:
+            logger.info(f"VariableHandler is using dictionary: {dictionary_name}")
+            logger.info(f"{dictionary}")
+        dictionary[key] = value
+        if self.debug:
+            logger.info("Value added =>>")
+            logger.info(f"{dictionary}")
 
     def get_from_var(self, participant, variable: str):
         data = self.get_data_at_level(participant)
@@ -30,6 +48,8 @@ class VariableHandler:
         data = self.get_data_at_level(participant)
         try:
             value = data[variable]
+            if self.debug:
+                logger.info(f"VariableHandler succeeded ==> Variable {variable} has value {value} (type:{type(value)})")
             return value
         except Exception as e:
             data[variable] = None

@@ -22,10 +22,23 @@ from psynet.timeline import (
     for_loop,
     join,
 )
+from psynet.modular_page import (
+    ModularPage,
+    Prompt,
+    PushButtonControl,
+)
 
+from .game_parameters import (
+    COORDINATOR_INITIAL_ENDOWMENT,
+    NUM_ROUNDS,
+)
 from .variable_handler import VariableHandler
 
-variable_handler = VariableHandler(level="trial")
+variable_handler = VariableHandler(
+    level="trial",
+    use_vars=True,
+)
+variable_handler.debug = True
 
 logger = get_logger()
 Pos = Tuple[int, int]  # (x, y)
@@ -41,30 +54,37 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
 
     def show_trial(self, experiment, participant):
 
+        variable_handler.set_value(participant, "budget_dict", {0: COORDINATOR_INITIAL_ENDOWMENT})
+
         list_of_pages = [
             InfoPage(
-                "Here we go!",
+                "This is going to be the instructions for the COORDINATOR.",
                 time_estimate=1,
             ),
             # MAIN LOOP IS HERE
             for_loop(
                 label="test_rounds",
-                iterate_over=range(0, 3),
+                iterate_over=range(NUM_ROUNDS),
                 logic=lambda number: join(
-                    PageMaker(
-                        lambda participant: InfoPage(
-                            f"I've seen this page {number} times."
-                            f"Value: {variable_handler.get_value(participant, 'test')}",
-                            time_estimate=5,
+                    ModularPage(
+                        label="answer",
+                        prompt=Prompt(f"This is round {number}"),
+                        control=PushButtonControl(
+                            choices=[
+                                f"{number}: {variable_handler.get_value(participant, 'budget_dict')}"
+                            ],
+                            labels=["Next"]
                         ),
                         time_estimate=5,
                     ),
                     CodeBlock(
-                        lambda participant: participant.var.set(
-                            "test",
-                            number ** 2,
+                        lambda participant: variable_handler.set_dictionary_value(
+                            participant=participant,
+                            dictionary_name="budget_dict",
+                            key=number,
+                            value=number+1,
                         )
-                    ),
+                    )
                 ),
                 time_estimate_per_iteration=5,
             ),
