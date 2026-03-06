@@ -1,12 +1,5 @@
-numpy
-pillow
-matplotlib
-markupsafe
-psynet==13.0.0
-markup==0.2.2
-dallinger==11.5.5
-
-# psynet@git+https://gitlab.com/PsyNetDev/PsyNet@master#egg=psynet
+rq<2.0
+psynet@git+https://gitlab.com/PsyNetDev/PsyNet@master#egg=psynet
 
 # Alternatively, you can use one of the following syntaxes to specify a custom PsyNet version
 # psynet@git+https://gitlab.com/PsyNetDev/PsyNet@v10.4.0#egg=psynet

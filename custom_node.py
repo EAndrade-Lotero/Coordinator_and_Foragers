@@ -7,7 +7,11 @@ from typing import Dict, Any
 from psynet.trial import ChainNode
 from psynet.utils import get_logger
 from psynet.trial.create_and_rate import CreateAndRateNodeMixin
-from psynet.trial.imitation_chain import ImitationChainTrial
+
+from .game_parameters import (
+    POWER_ROLES,
+    RNG,
+)
 
 logger = get_logger()
 
@@ -27,14 +31,40 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
         # Get current seed
         seed = self.seed.copy()
 
-        # Get new sliders settings
-        coordinator = self.get_coordinator(trials)
+        power_role = self.participant_group
+        assert power_role in POWER_ROLES
 
-        # Beget sliders settings
-        for parameter in ["overhead", "wages", "prerogative"]:
-            seed["sliders"][parameter] = coordinator.answer[parameter],
+        if power_role == "coordinator":
+            # Get new sliders settings
+            coordinator = self.get_coordinator(trials)
+            overhead = coordinator.vars["overhead"]
+        elif power_role == "forager":
+            forager_trials = self.get_foragers(trials)
+            overheads = [trial.vars["overhead"] for trial in forager_trials]
+            forager_id = RNG.choice(len(forager_trials))
+            overhead = overheads[forager_id]
+            self.vars["power_forager_id"] = forager_id
+            logger.info(f"Power was given to forager {forager_id}")
+        else:
+            raise NotImplementedError
 
-        # Beget number of coins
+        # Transmit overhead
+        seed["sliders"]["overhead"] = overhead
+
+        return seed
+
+    def get_coordinator(self, trials):
+        coordinator = [
+            trial for trial in trials
+            if (
+                    'coordinator' in str(trial).lower()
+                    and "node" not in str(trial).lower()
+            )
+        ]
+        assert len(coordinator) == 1
+        return coordinator[0]
+
+    def get_foragers(self, trials):
         forager_trials = [
             trial for trial in trials
             if (
@@ -44,13 +74,4 @@ class CustomNode(CreateAndRateNodeMixin, ChainNode):
                     and "node" not in str(trial).lower()
             )
         ]
-        coins = [len(trial.answer["coins_foraged"])  for trial in forager_trials]
-        n_coins = sum(coins)
-        seed["n_coins"] = n_coins
-
-        return seed
-
-    def get_coordinator(self, trials):
-        coordinator = [trial for trial in trials if 'coordinator' in str(trial).lower()]
-        assert len(coordinator) == 1
-        return coordinator[0]
+        return forager_trials
