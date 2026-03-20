@@ -6,12 +6,21 @@ import psynet.experiment
 from psynet.timeline import (
     Timeline,
     CodeBlock,
+    join,
 )
+from psynet.page import InfoPage
+from psynet.modular_page import ModularPage, PushButtonControl
 from psynet.utils import get_logger
+from psynet.trial.create_and_rate import CreateAndRateTrialMakerMixin
+from psynet.trial.imitation_chain import ImitationChainTrialMaker
+from psynet.trial import ChainNode
+from psynet.trial.create_and_rate import CreateAndRateNodeMixin
+from psynet.trial.create_and_rate import (
+    CreateTrialMixin,
+    RateTrialMixin,
+)
+from psynet.trial.imitation_chain import ImitationChainTrial
 
-from .custom_classes import CoordinatorTrial, ForagerTrial
-from .custom_trialmaker import CreateAndRateTrialMaker
-from .custom_node import CustomNode
 from .game_parameters import (
     NUM_FORAGERS,
     OVERHEADS,
@@ -25,6 +34,70 @@ from .game_parameters import (
 logger = get_logger()
 
 ##########################################################################################
+# Node
+##########################################################################################
+class CustomNode(CreateAndRateNodeMixin, ChainNode):
+
+    def create_definition_from_seed(self, seed, experiment, participant):
+        return seed
+
+##########################################################################################
+# TrialMaker
+##########################################################################################
+class CreateAndRateTrialMaker(CreateAndRateTrialMakerMixin, ImitationChainTrialMaker):
+    pass
+
+##########################################################################################
+# Coordinator Trial
+##########################################################################################
+class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
+
+    time_estimate = 320
+    accumulate_answers = True
+
+    def show_trial(self, experiment, participant):
+        return join([
+            InfoPage(
+                "This is the information investment page",
+                time_estimate=self.time_estimate,
+            ),
+            ModularPage(
+                label="locations",
+                prompt="This assign the locations",
+                control=PushButtonControl(
+                    labels=["Next"],
+                    choices=["[pos1, pos2]"]
+                ),
+                time_estimate=self.time_estimate,
+            )
+        ])
+
+##########################################################################################
+# Forager Trial
+##########################################################################################
+class ForgerTrial(RateTrialMixin, ImitationChainTrial):
+    time_estimate = 320
+    accumulate_answers = True
+
+    def show_trial(self, experiment, participant):
+        return join([
+            InfoPage(
+                "This is the fuel investment page",
+                time_estimate=self.time_estimate,
+            ),
+            ModularPage(
+                label="locations",
+                prompt="This harvests the coins",
+                control=PushButtonControl(
+                    labels=["Next"],
+                    choices=["[coin1, coin2, coin3]"]
+                ),
+                time_estimate=self.time_estimate,
+            )
+        ])
+
+
+##########################################################################################
 # Experiment
 ##########################################################################################
 
@@ -32,12 +105,10 @@ START_NODES = [
     CustomNode(
         context=ASSETS_PATHS,
         seed={
-            "overhead": overhead,
+            "commission": 0.5,
         },
-        participant_group=participant_group
+        participant_group="forager"
     )
-    for overhead in OVERHEADS
-    for participant_group in POWER_ROLES
 ]
 
 
@@ -83,7 +154,7 @@ class Exp(psynet.experiment.Experiment):
         CodeBlock(
             lambda participant: participant.var.set(
                 "participant_group",
-                POWER_ROLES[RNG.choice(len(POWER_ROLES))],
+                RNG.choice(POWER_ROLES),
             )
         ),
         # Start the game with trial maker
