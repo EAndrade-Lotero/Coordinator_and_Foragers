@@ -14,11 +14,8 @@ from .custom_trialmaker import CreateAndRateTrialMaker
 from .custom_node import CustomNode
 from .game_parameters import (
     NUM_FORAGERS,
-    INITIAL_WEALTH,
-    STARTING_SLIDERS,
     OVERHEADS,
     POWER_ROLES,
-    WORLD_PATHS,
     ASSETS_PATHS,
     MAX_NODES_PER_CHAIN,
     NUMBER_OF_TRIALS,
@@ -35,14 +32,10 @@ START_NODES = [
     CustomNode(
         context=ASSETS_PATHS,
         seed={
-            "sliders": {
-                "overhead": overhead,
-            },
-            "world_path": world_path,
+            "overhead": overhead,
         },
         participant_group=participant_group
     )
-    for i, world_path in enumerate(WORLD_PATHS)
     for overhead in OVERHEADS
     for participant_group in POWER_ROLES
 ]

@@ -43,7 +43,7 @@ STARTING_SLIDERS = {
 #     f"static/map{i}.json" for i in range(16)
 # ]
 OVERHEADS = [0.05]
-POWER_ROLES = ["forager"]
+POWER_ROLES = ["forager"]  # coordinator, forager, rlagent
 WORLD_PATHS = [
     f"static/map{i}.json" for i in range(1)
 ]
