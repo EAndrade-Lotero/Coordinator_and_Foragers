@@ -7,9 +7,14 @@ from psynet.timeline import (
     Timeline,
     CodeBlock,
     join,
+    PageMaker,
 )
 from psynet.page import InfoPage
-from psynet.modular_page import ModularPage, PushButtonControl
+from psynet.modular_page import (
+    ModularPage,
+    PushButtonControl,
+    Control,
+)
 from psynet.utils import get_logger
 from psynet.trial.create_and_rate import CreateAndRateTrialMakerMixin
 from psynet.trial.imitation_chain import ImitationChainTrialMaker
@@ -32,6 +37,36 @@ from .game_parameters import (
 )
 
 logger = get_logger()
+
+##########################################################################################
+# Control
+##########################################################################################
+class CustomControl(Control):
+
+    macro = "locating_foragers"
+    external_template = "position-foragers-control.html"
+
+    def __init__(self):
+        super().__init__()
+        self.test = "This is the test"
+
+
+##########################################################################################
+# Pages
+##########################################################################################
+class CustomPage(ModularPage):
+
+    def __init__(self, label, time_estimate:int) -> None:
+
+        # Initialize the modular page
+        super().__init__(
+            label=label,
+            prompt="Please drag the icon you prefer on the right rectangle:",
+            control=CustomControl(),
+            time_estimate=time_estimate,
+            save_answer=label,
+        )
+
 
 ##########################################################################################
 # Node
@@ -61,6 +96,18 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 "This is the information investment page",
                 time_estimate=self.time_estimate,
             ),
+            CustomPage(
+                label="positions",
+                time_estimate=20,
+            ),
+            PageMaker(
+                lambda experiment, participant:
+                InfoPage(
+                    f"{participant.answer}",
+                    time_estimate=5
+                ),
+                time_estimate=5
+            ),
             ModularPage(
                 label="locations",
                 prompt="This assign the locations",
@@ -75,7 +122,7 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
 ##########################################################################################
 # Forager Trial
 ##########################################################################################
-class ForgerTrial(RateTrialMixin, ImitationChainTrial):
+class ForagerTrial(RateTrialMixin, ImitationChainTrial):
     time_estimate = 320
     accumulate_answers = True
 

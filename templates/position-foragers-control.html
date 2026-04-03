@@ -1,0 +1,151 @@
+{% macro locating_foragers(config) %}
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #eceaea;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+/* layout */
+.wrapper {
+    display: flex;
+    gap: 80px;
+}
+
+/* left avatar container */
+.avatar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* avatars */
+.avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    cursor: grab;
+}
+
+.drop-zone {
+    width: 200px;
+    height: 200px;
+    border: 3px dashed #777;
+    border-radius: 16px;
+
+    position: relative;
+}
+
+/* background label */
+.drop-label {
+    position: absolute;
+    inset: 0;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    color: #777;
+    font-weight: bold;
+
+    pointer-events: none; /* allows dragging through text */
+}
+
+</style>
+
+<div>{{ config.test }}</div>
+
+<div class="wrapper">
+
+    <!-- LEFT SIDE -->
+    <div class="avatar-container">
+        <img src=url("../static/forager.png")
+             id="avatar1"
+             class="avatar"
+             draggable="true">
+
+        <img src="static/forager.png"
+             id="avatar2"
+             class="avatar"
+             draggable="true">
+    </div>
+
+
+    <!-- RIGHT SIDE -->
+    <div id="dropZone" class="drop-zone">
+        <div class="drop-label">Drop avatars here</div>
+        <div class="avatar-layer"></div>
+    </div>
+</div>
+
+
+<script>
+
+// make avatars draggable
+document.querySelectorAll(".avatar").forEach(avatar => {
+
+    avatar.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", avatar.id);
+    });
+
+});
+
+
+// enable dropping
+const dropZone = document.getElementById("dropZone");
+
+dropZone.addEventListener("dragover", e => {
+    e.preventDefault(); // required
+});
+
+
+dropZone.addEventListener("drop", e => {
+
+    e.preventDefault();
+
+    const id = e.dataTransfer.getData("text/plain");
+    const avatar = document.getElementById(id);
+
+    dropZone.appendChild(avatar);
+
+});
+
+function getAvatarCoordinates() {
+
+    const dropZone = document.getElementById("dropZone");
+    const avatars = dropZone.querySelectorAll(".avatar");
+
+    const zoneRect = dropZone.getBoundingClientRect();
+
+    let results = [];
+
+    avatars.forEach(avatar => {
+
+        const rect = avatar.getBoundingClientRect();
+
+        results.push({
+            id: avatar.id,
+            x: rect.left - zoneRect.left,
+            y: rect.top - zoneRect.top
+        });
+
+    });
+
+    return results;
+}
+
+/////////////////////////////////////////////////////
+// Function to stage the response for PsyNet
+/////////////////////////////////////////////////////
+psynet.stageResponse = function() {
+
+    psynet.response.staged.rawAnswer = getAvatarCoordinates();
+}
+
+</script>
+
+{% endmacro %}
