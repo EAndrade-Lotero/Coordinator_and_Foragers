@@ -34,9 +34,14 @@ from .game_parameters import (
     MAX_NODES_PER_CHAIN,
     NUMBER_OF_TRIALS,
     RNG,
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
+    NUM_ROUNDS,
 )
+from .variable_handler import VariableHandler
 
 logger = get_logger()
+variable_handler = VariableHandler()
 
 ##########################################################################################
 # Control
@@ -48,7 +53,7 @@ class CustomControl(Control):
 
     def __init__(self):
         super().__init__()
-        self.test = "This is the test"
+        self.test = "This is a new test"
 
 
 ##########################################################################################
@@ -66,6 +71,25 @@ class CustomPage(ModularPage):
             time_estimate=time_estimate,
             save_answer=label,
         )
+
+    def format_answer(self, raw_answer, **kwargs):
+        logger.info(f"Page Raw answer: {raw_answer}")
+
+        raw_positions = raw_answer['placements']
+        positions = dict()
+        for dict_position in raw_positions:
+            placed = dict_position['placed']
+            forager_id = dict_position['id'][-1]
+            if placed:
+                positions[forager_id] = (dict_position['x'], dict_position['y'])
+            else:
+                positions[forager_id] = (
+                    RNG.integers(0, WORLD_WIDTH, 1),
+                    RNG.integers(0, WORLD_HEIGHT, 1)
+                )  # <= modify depending on expected performance
+
+        logger.info(f"Positions: {positions}")
+        return positions
 
 
 ##########################################################################################
@@ -96,21 +120,10 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 "This is the information investment page",
                 time_estimate=self.time_estimate,
             ),
-            CustomPage(
-                label="positions",
-                time_estimate=20,
-            ),
-            PageMaker(
-                lambda experiment, participant:
-                InfoPage(
-                    f"{participant.answer}",
-                    time_estimate=5
-                ),
-                time_estimate=5
-            ),
+            self.get_rounds(),
             ModularPage(
                 label="locations",
-                prompt="This assign the locations",
+                prompt="This is all folks!",
                 control=PushButtonControl(
                     labels=["Next"],
                     choices=["[pos1, pos2]"]
@@ -118,6 +131,31 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
                 time_estimate=self.time_estimate,
             )
         ])
+
+    @staticmethod
+    def get_rounds():
+        list_of_lists = [
+            [
+                CustomPage(
+                    label=f"positions-{i}",
+                    time_estimate=20,
+                ),
+                PageMaker(
+                    lambda experiment, participant:
+                    InfoPage(
+                        f"{variable_handler.get_value_from_last_answer(
+                            participant=participant,
+                            page_label=f"positions-{i}",
+                        )}",
+                        time_estimate=5
+                    ),
+                    time_estimate=5
+                )
+            ]
+            for i in range(1)
+        ]
+        list_of_lists = [page for list_ in list_of_lists for page in list_]
+        return join(list_of_lists)
 
 ##########################################################################################
 # Forager Trial

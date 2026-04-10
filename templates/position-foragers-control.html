@@ -1,151 +1,180 @@
 {% macro locating_foragers(config) %}
 
 <style>
-body {
+.locating-foragers-root {
     font-family: Arial, sans-serif;
     background: #eceaea;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
+    padding: 24px;
+    border-radius: 16px;
 }
 
-/* layout */
-.wrapper {
+.locating-foragers-root .wrapper {
     display: flex;
     gap: 80px;
+    align-items: flex-start;
 }
 
-/* left avatar container */
-.avatar-container {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+.locating-foragers-root .avatar-container {
+    position: relative;
+    width: 100px;
+    height: 220px;
 }
 
-/* avatars */
-.avatar {
+.locating-foragers-root .avatar {
     width: 80px;
     height: 80px;
     border-radius: 12px;
     cursor: grab;
+    user-select: none;
+    -webkit-user-drag: element;
+    position: absolute;
 }
 
-.drop-zone {
-    width: 200px;
-    height: 200px;
+.locating-foragers-root .drop-zone {
+    width: 420px;
+    height: 320px;
     border: 3px dashed #777;
     border-radius: 16px;
-
     position: relative;
+    background: #ffffff;
+    overflow: hidden;
 }
 
-/* background label */
-.drop-label {
+.locating-foragers-root .drop-label {
     position: absolute;
     inset: 0;
-
     display: flex;
     justify-content: center;
     align-items: center;
-
     color: #777;
     font-weight: bold;
-
-    pointer-events: none; /* allows dragging through text */
+    pointer-events: none;
 }
 
+.locating-foragers-root .debug-box {
+    margin-top: 16px;
+    padding: 10px;
+    background: #f4f4f4;
+    border-radius: 8px;
+    font-size: 13px;
+    white-space: pre-wrap;
+}
 </style>
 
-<div>{{ config.test }}</div>
+<div class="locating-foragers-root">
+    {% if config.prompt %}
+        <p><strong>{{ config.prompt }}</strong></p>
+    {% endif %}
 
-<div class="wrapper">
+    {% if config.test %}
+        <div>{{ config.test }}</div>
+    {% endif %}
 
-    <!-- LEFT SIDE -->
-    <div class="avatar-container">
-        <img src=url("../static/forager.png")
-             id="avatar1"
-             class="avatar"
-             draggable="true">
+    <div class="wrapper">
+        <div class="avatar-container">
+            <img
+                src="/static/forager.png"
+                id="avatar1"
+                class="avatar"
+                draggable="true"
+                style="left: 0px; top: 0px;"
+            >
 
-        <img src="static/forager.png"
-             id="avatar2"
-             class="avatar"
-             draggable="true">
+            <img
+                src="/static/forager.png"
+                id="avatar2"
+                class="avatar"
+                draggable="true"
+                style="left: 0px; top: 110px;"
+            >
+        </div>
+
+        <div id="dropZone" class="drop-zone">
+            <div class="drop-label">Drop avatars here</div>
+        </div>
     </div>
 
+    <div id="debugBox" class="debug-box">Waiting for placements...</div>
 
-    <!-- RIGHT SIDE -->
-    <div id="dropZone" class="drop-zone">
-        <div class="drop-label">Drop avatars here</div>
-        <div class="avatar-layer"></div>
-    </div>
-</div>
+    <script>
+    (function () {
+        const root = document.currentScript.closest(".locating-foragers-root");
 
+        if (!root) {
+            console.error("locating-foragers-root not found");
+            return;
+        }
 
-<script>
+        const avatars = root.querySelectorAll(".avatar");
+        const dropZone = root.querySelector("#dropZone");
+        const debugBox = root.querySelector("#debugBox");
 
-// make avatars draggable
-document.querySelectorAll(".avatar").forEach(avatar => {
-
-    avatar.addEventListener("dragstart", e => {
-        e.dataTransfer.setData("text/plain", avatar.id);
-    });
-
-});
-
-
-// enable dropping
-const dropZone = document.getElementById("dropZone");
-
-dropZone.addEventListener("dragover", e => {
-    e.preventDefault(); // required
-});
-
-
-dropZone.addEventListener("drop", e => {
-
-    e.preventDefault();
-
-    const id = e.dataTransfer.getData("text/plain");
-    const avatar = document.getElementById(id);
-
-    dropZone.appendChild(avatar);
-
-});
-
-function getAvatarCoordinates() {
-
-    const dropZone = document.getElementById("dropZone");
-    const avatars = dropZone.querySelectorAll(".avatar");
-
-    const zoneRect = dropZone.getBoundingClientRect();
-
-    let results = [];
-
-    avatars.forEach(avatar => {
-
-        const rect = avatar.getBoundingClientRect();
-
-        results.push({
-            id: avatar.id,
-            x: rect.left - zoneRect.left,
-            y: rect.top - zoneRect.top
+        avatars.forEach(avatar => {
+            avatar.addEventListener("dragstart", e => {
+                e.dataTransfer.setData("text/plain", avatar.id);
+            });
         });
 
-    });
+        dropZone.addEventListener("dragover", e => {
+            e.preventDefault();
+        });
 
-    return results;
-}
+        dropZone.addEventListener("drop", e => {
+            e.preventDefault();
 
-/////////////////////////////////////////////////////
-// Function to stage the response for PsyNet
-/////////////////////////////////////////////////////
-psynet.stageResponse = function() {
+            const id = e.dataTransfer.getData("text/plain");
+            const avatar = root.querySelector("#" + id);
 
-    psynet.response.staged.rawAnswer = getAvatarCoordinates();
-}
+            if (!avatar) return;
 
-</script>
+            const zoneRect = dropZone.getBoundingClientRect();
+
+            const x = e.clientX - zoneRect.left - avatar.offsetWidth / 2;
+            const y = e.clientY - zoneRect.top - avatar.offsetHeight / 2;
+
+            const clampedX = Math.max(0, Math.min(x, zoneRect.width - avatar.offsetWidth));
+            const clampedY = Math.max(0, Math.min(y, zoneRect.height - avatar.offsetHeight));
+
+            dropZone.appendChild(avatar);
+            avatar.style.position = "absolute";
+            avatar.style.left = clampedX + "px";
+            avatar.style.top = clampedY + "px";
+
+            updateDebug();
+        });
+
+        function getPositions() {
+            const res = [];
+
+            avatars.forEach(a => {
+                const placed = a.parentElement === dropZone;
+
+                res.push({
+                    id: a.id,
+                    placed: placed,
+                    x: placed ? parseFloat(a.style.left || "0") : null,
+                    y: placed ? parseFloat(a.style.top || "0") : null
+                });
+            });
+
+            return res;
+        }
+
+        function updateDebug() {
+            if (debugBox) {
+                debugBox.textContent = JSON.stringify(getPositions(), null, 2);
+            }
+        }
+
+        updateDebug();
+
+        psynet.stageResponse = function () {
+            psynet.response.staged.rawAnswer = {
+                placements: getPositions()
+            };
+        };
+    })();
+    </script>
+</div>
 
 {% endmacro %}
