@@ -3,6 +3,9 @@
 # Imports
 ##########################################################################################
 from cProfile import label
+from typing import Union, Optional, List
+
+from markupsafe import Markup
 
 import psynet.experiment
 from psynet.timeline import (
@@ -16,6 +19,7 @@ from psynet.modular_page import (
     ModularPage,
     PushButtonControl,
     Control,
+    Prompt,
 )
 from psynet.utils import get_logger
 from psynet.trial.create_and_rate import CreateAndRateTrialMakerMixin
@@ -46,6 +50,33 @@ logger = get_logger()
 variable_handler = VariableHandler()
 
 ##########################################################################################
+# Prompt
+##########################################################################################
+class CustomPrompt(Prompt):
+
+    macro = "timeout"
+    external_template = "custom-prompt-with-timer.html"
+
+    def __init__(
+        self,
+        timeout:int,
+        timeout_answer:str='No answer',
+        text: Union[None, str, Markup] = None,
+        text_align: str = "left",
+        buttons: Optional[List] = None,
+        loop: bool = False,
+    ):
+        super().__init__(
+            text=text,
+            text_align=text_align,
+            buttons=buttons,
+            loop=loop,
+        )
+        self.timeoutSeconds = 10
+        self.timeoutAnswer = timeout_answer
+
+
+##########################################################################################
 # Control
 ##########################################################################################
 class CustomControl(Control):
@@ -63,12 +94,23 @@ class CustomControl(Control):
 ##########################################################################################
 class CustomPage(ModularPage):
 
-    def __init__(self, label, time_estimate:int) -> None:
+    def __init__(
+        self,
+        label,
+        time_estimate:int,
+        timeout: int=10,
+        timeout_answer: str='No answer',
+    ) -> None:
 
         # Initialize the modular page
         super().__init__(
             label=label,
-            prompt="Please drag the icon you prefer on the right rectangle:",
+            prompt=CustomPrompt(
+                timeout=timeout,
+                timeout_answer=timeout_answer,
+                text="Please drag the icon you prefer on the right rectangle:",
+            ),
+            # prompt="Please drag the icon you prefer on the right rectangle:",
             control=CustomControl(),
             time_estimate=time_estimate,
             save_answer=label,
@@ -118,11 +160,20 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
 
     def show_trial(self, experiment, participant):
         return join([
+            #---------------------------------------
+            # INSTRUCTIONS
+            #---------------------------------------
             InfoPage(
-                "This is the information investment page",
+                "This is the INSTRUCTIONS",
                 time_estimate=self.time_estimate,
             ),
+            #---------------------------------------
+            # ROUNDS
+            #---------------------------------------
             self.get_rounds(),
+            #---------------------------------------
+            # DEBRIEF
+            #---------------------------------------
             ModularPage(
                 label="locations",
                 prompt="This is all folks!",
@@ -135,30 +186,27 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
         ])
 
     def get_rounds(self):
+        # ---------------------------------------
+        # LIST OF ROUNDS
+        # ---------------------------------------
         list_of_lists = [
+            # ---------------------------------------
+            # SINGLE ROUND
+            # ---------------------------------------
             [
-                ModularPage(
+                CustomPage(
                     label=f"positions-{i}",
-                    prompt=f"positions-{i}",
-                    control=PushButtonControl(
-                        labels=["A", "B", "C"],
-                        choices=["A", "B", "C"],
-                    ),
-                    time_estimate=5,
+                    time_estimate=20,
                 ),
                 CodeBlock(
                     lambda participant: logger.info(f"Answer accumulators: {participant.answer_accumulators}"),
                 ),
-                # CustomPage(
-                #     label=f"positions-{i}",
-                #     time_estimate=20,
-                # ),
                 InfoPage(
                     f"{self.get_value_from_last_answer()}",
                     time_estimate=5
                 ),
             ]
-            for i in range(3)
+            for i in range(NUM_ROUNDS)
         ]
         list_of_lists = [page for list_ in list_of_lists for page in list_]
         return join(list_of_lists)
@@ -168,11 +216,11 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
         if len(self.participant.answer_accumulators) > 0:
             last_answer = self.participant.answer_accumulators[-1]
             logger.info(f"Last answer: {last_answer}")
-            answer = []
+            answers = []
             for key, value in last_answer.items():
-                answer.append(value)
-            if len(answer) > 0:
-                return answer[-1]
+                answers.append(value)
+            if len(answers) > 0:
+                return answers[-1]
         return "Hang tight!"
 
 ##########################################################################################

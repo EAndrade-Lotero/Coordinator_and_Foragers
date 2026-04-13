@@ -85,7 +85,7 @@ class VariableHandler:
         return data
 
     @staticmethod
-    def get_value_from_last_answer(participant, page_label: str):
+    def get_value_from_page(participant, page_label: str):
         last_answer = participant.answer_accumulators[-1]
         assert isinstance(last_answer, dict)
         assert page_label in last_answer.keys(), f"Error: page with label {page_label} is not in answers. Found only: {last_answer.keys()}"
@@ -93,6 +93,15 @@ class VariableHandler:
         return value
 
     @staticmethod
-    def set_value_from_last_answer(participant, page_label: str, variable: str):
-        value = VariableHandler.get_value_from_last_answer(participant, page_label)
+    def set_value_from_page(participant, page_label: str, variable: str):
+        value = VariableHandler.get_value_from_page(participant, page_label)
         participant.current_trial.vars[variable] = value
+
+    @staticmethod
+    def get_value_from_last_answer(participant):
+        last_answer = participant.answer_accumulators[-1]
+        assert isinstance(last_answer, dict)
+        answer = []
+        for key, value in last_answer.items():
+            answer.append(value)
+        return answer[0]

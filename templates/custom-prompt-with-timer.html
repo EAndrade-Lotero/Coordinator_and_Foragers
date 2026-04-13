@@ -1,0 +1,55 @@
+{% macro timeout(config) %}
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #eceaea;
+}
+
+/* Timer container */
+.timer-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    padding: 12px 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    font-size: 22px;
+    font-weight: bold;
+}
+</style>
+
+<div class="timer-container" id="timer">
+05:00
+</div>
+
+<script>
+let timeRemaining = {{ config.timeoutSeconds }};
+
+function updateTimer() {
+    let minutes = Math.floor(timeRemaining / 60);
+    let seconds = timeRemaining % 60;
+
+    seconds = seconds < 10 ? "0" + seconds : seconds;
+
+    document.getElementById("timer").textContent =
+        minutes + ":" + seconds;
+
+    if (timeRemaining > 0) {
+        timeRemaining--;
+    } else {
+        clearInterval(timerInterval);
+        document.getElementById("timer").textContent = "Time's up!";
+        const timeoutAnswer = "{{ config.timeoutAnswer }}";
+        psynet.nextPage(timeoutAnswer);
+    }
+}
+
+updateTimer();
+
+let timerInterval = setInterval(updateTimer, 1000);
+</script>
+
+{% endmacro %}
