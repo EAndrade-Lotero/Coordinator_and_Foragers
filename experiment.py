@@ -2,6 +2,8 @@
 ##########################################################################################
 # Imports
 ##########################################################################################
+from cProfile import label
+
 import psynet.experiment
 from psynet.timeline import (
     Timeline,
@@ -132,30 +134,46 @@ class CoordinatorTrial(CreateTrialMixin, ImitationChainTrial):
             )
         ])
 
-    @staticmethod
-    def get_rounds():
+    def get_rounds(self):
         list_of_lists = [
             [
-                CustomPage(
+                ModularPage(
                     label=f"positions-{i}",
-                    time_estimate=20,
-                ),
-                PageMaker(
-                    lambda experiment, participant:
-                    InfoPage(
-                        f"{variable_handler.get_value_from_last_answer(
-                            participant=participant,
-                            page_label=f"positions-{i}",
-                        )}",
-                        time_estimate=5
+                    prompt=f"positions-{i}",
+                    control=PushButtonControl(
+                        labels=["A", "B", "C"],
+                        choices=["A", "B", "C"],
                     ),
+                    time_estimate=5,
+                ),
+                CodeBlock(
+                    lambda participant: logger.info(f"Answer accumulators: {participant.answer_accumulators}"),
+                ),
+                # CustomPage(
+                #     label=f"positions-{i}",
+                #     time_estimate=20,
+                # ),
+                InfoPage(
+                    f"{self.get_value_from_last_answer()}",
                     time_estimate=5
-                )
+                ),
             ]
-            for i in range(1)
+            for i in range(3)
         ]
         list_of_lists = [page for list_ in list_of_lists for page in list_]
         return join(list_of_lists)
+
+    def get_value_from_last_answer(self):
+        logger.info(f"Answer accumulators: {self.participant.answer_accumulators}")
+        if len(self.participant.answer_accumulators) > 0:
+            last_answer = self.participant.answer_accumulators[-1]
+            logger.info(f"Last answer: {last_answer}")
+            answer = []
+            for key, value in last_answer.items():
+                answer.append(value)
+            if len(answer) > 0:
+                return answer[-1]
+        return "Hang tight!"
 
 ##########################################################################################
 # Forager Trial
@@ -175,11 +193,15 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                 prompt="This harvests the coins",
                 control=PushButtonControl(
                     labels=["Next"],
-                    choices=["[coin1, coin2, coin3]"]
+                    choices=[0]
                 ),
                 time_estimate=self.time_estimate,
             )
         ])
+
+    def format_answer(self, raw_answer, **kwargs):
+        answer = raw_answer['locations']
+        return answer
 
 
 ##########################################################################################
@@ -208,7 +230,7 @@ def get_trial_maker():
         # mixin params
         include_previous_iteration=True,
         rate_mode="rate",
-        target_selection_method="all",
+        target_selection_method="one",
         verbose=True,  # for the demo
         # trial_maker params
         id_="coordinator_and_foragers_trial_maker",
