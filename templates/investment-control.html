@@ -1,0 +1,313 @@
+{% macro investment(config) %}
+
+  <style>
+:root { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    body { margin: 24px; max-width: 700px; }
+
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin-bottom: 30px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+    label { font-size: 14px; text-align: center; }
+    input[type="number"] {
+      width: 160px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 10px;
+    }
+
+    .slider-row { display: grid; gap: 10px; margin-top: 8px; }
+    input[type="range"] { width: 100%; }
+
+    /* New: min (left), current (center, bigger), max (right) */
+    .min-current-max {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      width: 100%;
+      font-size: 14px;
+      margin-top: 2px;
+    }
+    .min-current-max .min { justify-self: start; }
+    .min-current-max .max { justify-self: end; }
+    .min-current-max .current {
+      justify-self: center;
+      font-size: 18px; /* a bit larger */
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: #f4f4f6;
+    }
+    canvas { border: 1px solid #ddd; border-radius: 10px; image-rendering: pixelated; }
+    input[type="range"] { width: min(720px, 100%); }
+    button {
+      border: 1px solid #ccc; background: white; border-radius: 10px;
+      padding: 8px 12px; cursor: pointer;
+    }
+    button:active { transform: translateY(1px); }
+    code { background: #f6f6f6; padding: 2px 6px; border-radius: 6px; }
+    .final-note {
+        margin-top: 2em;
+        font-weight: bold;
+    }
+    .final-note1 {
+        font-weight: bold;
+        text-align: center;
+    }
+        /* New: min (left), current (center, bigger), max (right) */
+    .min-current-max {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      width: 100%;
+      font-size: 14px;
+      margin-top: 2px;
+    }
+    .min-current-max .min { justify-self: start; }
+    .min-current-max .max { justify-self: end; }
+    .min-current-max .current {
+      justify-self: center;
+      font-size: 18px; /* a bit larger */
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: #f4f4f6;
+    }
+  </style>
+
+<body>
+    <div class="card">
+        <p class="final-note1" id="info">Your map view at the current investment level</p>
+        <div class="row">
+          <canvas id="img" width="400" height="400"></canvas>
+        </div>
+    </div>
+
+  <div class="card">
+    <div class="slider-row">
+      <input id="slider" type="range" />
+
+      <div class="min-current-max">
+        <div class="min">Min: <strong id="minLabel">0</strong></div>
+        <div class="current"><span id="currentLabel">0</span> coins</div>
+        <div class="max">Max: <strong id="maxLabel">{{ config.endowment }}</strong></div>
+      </div>
+    </div>
+  </div>
+  <p class="final-note">
+    Note: This is a training example. In the actual task, you will need to discover
+    the real map, which may change from round to round.
+  </p>
+  <br>
+  <p class="final-note">
+    If you are ready to continue, press the 'Next' button.
+  </p>
+
+  <script>
+    const W = {{ config.W }};
+    const H = {{ config.H }};
+
+    let initialFlat = {{ config.arr }};
+
+    // Working copy (this is what gets mutated by the slider moves)
+    const currentFlat = [...initialFlat];
+    let randomCoins = Array.from({ length: H }, () => Array(W).fill(0));
+    const currentLabel = document.getElementById("currentLabel");
+
+    // =========================================================
+    // 1) Image generated from an array (we draw it on a canvas).
+    // =========================================================
+    const canvas = document.getElementById("img");
+    const ctx = canvas.getContext("2d");
+
+    const slider = document.getElementById("slider");
+    slider.min = String(0);
+    slider.max = String({{ config.endowment }});
+    slider.step = String(1);
+    slider.value = String(0);
+
+    const sliderValEl = document.getElementById("sliderVal");
+    const pValEl = document.getElementById("pVal");
+    const gridInfoEl = document.getElementById("gridInfo");
+    const onesInfoEl = document.getElementById("onesInfo");
+
+    const infoLabel = document.getElementById("info");
+
+    function indexToXY(index, WIDTH, HEIGHT) {
+      if (!Number.isInteger(index)) throw new TypeError("index must be an integer");
+      if (!Number.isInteger(WIDTH) || WIDTH <= 0) throw new TypeError("WIDTH must be a positive integer");
+      if (!Number.isInteger(HEIGHT) || HEIGHT <= 0) throw new TypeError("HEIGHT must be a positive integer");
+
+      const size = WIDTH * HEIGHT;
+      if (index < 0 || index >= size) {
+        throw new RangeError(`index out of range: ${index} (valid: 0..${size - 1})`);
+      }
+
+      const x = index % WIDTH;
+      const y = Math.floor(index / WIDTH);
+      return [x, y];
+    }
+
+    function countOnes(flat) {
+      let c = 0;
+      for (const v of flat) if (v === 1) c++;
+      return c;
+    }
+
+    function getSliderVal() {
+        return Math.floor(slider.value) / 10;
+    }
+
+    function sigmoidValue(x) {
+        const steepness = 15.0;
+        const threshold = 0.5;
+        const min_value = 0.2;
+        let value = 1.0 / (1.0 + Math.exp(-steepness * (x - threshold)));
+        return Math.max(value, min_value);
+    }
+
+    function drawReal() {
+      const canvas1 = document.getElementById("img");
+      const ctx1 = canvas1.getContext("2d");
+      const cellW = canvas1.width / W;
+      const cellH = canvas1.height / H;
+
+      // Background
+      ctx1.clearRect(0, 0, canvas1.width, canvas1.height);
+
+      // Draw cells (1 = black, 0 = white)
+      let p_view = sigmoidValue(getSliderVal());
+      let p_noise_coin = 1 - p_view;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+            const v = currentFlat[x][y];
+            if (v === 255) {
+                ctx1.fillStyle = `rgba(${255}, ${215}, ${5}, ${0.8})`;
+            } else {
+                ctx1.fillStyle = "#fff";
+                {#if (randomCoins[y][x] === 0) {#}
+                {#    ctx1.fillStyle = "#fff";#}
+                {#} else {#}
+                {#    ctx1.fillStyle = 0;#}
+                {#}#}
+            }
+          ctx1.fillRect(x * cellW, y * cellH, cellW, cellH);
+        }
+      }
+
+      // Optional: light grid
+      ctx1.strokeStyle = "#eee";
+      ctx1.lineWidth = 1;
+      for (let x = 0; x <= W; x++) {
+        ctx1.beginPath();
+        ctx1.moveTo(x * cellW, 0);
+        ctx1.lineTo(x * cellW, canvas.height);
+        ctx1.stroke();
+      }
+      for (let y = 0; y <= H; y++) {
+        ctx1.beginPath();
+        ctx1.moveTo(0, y * cellH);
+        ctx1.lineTo(W, y * cellH);
+        ctx1.stroke();
+      }
+    }
+
+    function createRandomCoins() {
+      let p_view = sigmoidValue(getSliderVal());
+      let p_noise_coin = 1 - p_view;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+            if (Math.random() < p_noise_coin) {
+                randomCoins[x][y] = 255;
+            } else {
+                randomCoins[x][y] = 0;
+            }
+        }
+      }
+    }
+
+    function draw() {
+      const cellW = canvas.width / W;
+      const cellH = canvas.height / H;
+
+      // Background
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      let black = "#fff";
+      let white = "#111";
+      let p_view = sigmoidValue(getSliderVal());
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+            const v = randomCoins[x][y];
+            if (v === 255) {
+                ctx.fillStyle = black;
+            } else {
+                if (currentFlat[x][y] === 140) {
+                    if (Math.random() < p_view) {
+                        ctx.fillStyle = black;
+                    } else {
+                        ctx.fillStyle = white;
+                    }
+                } else {
+                    ctx.fillStyle = white;
+                }
+            }
+
+          ctx.fillRect(x * cellW, y * cellH, cellW, cellH);
+        }
+      }
+
+      // Optional: light grid
+      ctx.strokeStyle = "#eee";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= W; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * cellW, 0);
+        ctx.lineTo(x * cellW, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= H; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * cellH);
+        ctx.lineTo(canvas.width, y * cellH);
+        ctx.stroke();
+      }
+    }
+
+    slider.addEventListener("input", () => {
+      const v = getSliderVal();
+      const p = sigmoidValue(v);
+      currentLabel.textContent = slider.value;
+      createRandomCoins();
+      draw();
+    });
+
+    function onCanvasEnter(e) {
+      // Pointer just entered the canvas
+      window.dispatchEvent(new CustomEvent("canvasHoverEnter", { detail: { event: e } }));
+    }
+    function onCanvasLeave(e) {
+      // Pointer just left the canvas
+      window.dispatchEvent(new CustomEvent("canvasHoverLeave", { detail: { event: e } }));
+    }
+
+    canvas.addEventListener("mouseenter", onCanvasEnter);
+    canvas.addEventListener("mouseleave", onCanvasLeave);
+
+    window.addEventListener("canvasHoverEnter", () => {
+        drawReal(currentFlat);
+        infoLabel.textContent = "Coins in this training example";
+    });
+    window.addEventListener("canvasHoverLeave", () => {
+        draw();
+        infoLabel.textContent = "Your map view at the current investment level";
+    });
+
+    // Initial render
+    draw();
+
+    /////////////////////////////////////////////////////
+    // Function to stage the response for PsyNet
+    /////////////////////////////////////////////////////
+    psynet.stageResponse = function() {
+          psynet.response.staged.rawAnswer = "OK";
+    }
+
+</script>
+
+{% endmacro %}

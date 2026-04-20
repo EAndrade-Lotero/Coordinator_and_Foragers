@@ -38,7 +38,7 @@ try:
         DISPERSION,
         NUM_FORAGERS,
         INITIAL_WEALTH,
-        COORDINATOR_ENDOWMENT,
+        COORDINATOR_INITIAL_ENDOWMENT,
         RNG,
         ASSETS_PATHS,
         MAX_MOVEMENT,
@@ -55,7 +55,7 @@ except:
         DISPERSION,
         NUM_FORAGERS,
         INITIAL_WEALTH,
-        COORDINATOR_ENDOWMENT,
+        COORDINATOR_INITIAL_ENDOWMENT,
         RNG,
         ASSETS_PATHS,
         MAX_MOVEMENT,
@@ -599,10 +599,10 @@ class World:
             proportion=self.proportion,
         )
         # Add random noise
-        randomly_placed_coins = self.create_random_coins(1 - p)
+        randomly_placed_coins = self.create_random_coins(1 - information_investment)
         coins += randomly_placed_coins
         # Keep only a max percentage of coins
-        max_coins = int(self.count_coins() * 0.8)
+        max_coins = int(self.count_coins() * 1)
         coins = self._rng.choice(coins, size=max_coins, replace=False).tolist()
 
         # Draw coins that are randomly selected to be seen according to investment
