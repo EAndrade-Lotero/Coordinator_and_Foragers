@@ -512,7 +512,7 @@ class World:
                 coin_img.image.axes = ax
                 ab = AnnotationBbox(
                     coin_img,
-                    (c + half, r + half),
+                    (c + half, self.height - r + half),
                     frameon=False
                 )
                 ax.add_artist(ab)
@@ -591,24 +591,52 @@ class World:
         terrain = np.ones((self.height, self.width)) * 140
         coins = self.coin_positions().copy()
         # Determine probability of view given investment
+        # p = World.get_probability_of_view(
+        #     information_investment,
+        #     threshold=0.62,
+        #     steepness=50.0,
+        #     min_value=0.02,
+        #     proportion=1.0,
+        # )
         p = World.get_probability_of_view(
             information_investment,
-            threshold=self.threshold,
-            steepness=self.steepness,
-            min_value=self.min_value,
-            proportion=self.proportion,
+            threshold=0.65,
+            steepness=8.0,
+            min_value=0.08,
+            proportion=0.95,
         )
+        # Generate the visible coins
+        visible_coins = []
+        for coin in coins:
+            if self._rng.random() < p:
+                visible_coins.append(coin)
         # Add random noise
-        randomly_placed_coins = self.create_random_coins(1 - information_investment)
-        coins += randomly_placed_coins
+        # p_random_coins = World.get_probability_of_view(
+        #     1 - information_investment,
+        #     threshold=0.38,
+        #     steepness=50.0,
+        #     min_value=0.0,
+        #     proportion=1.0,
+        # )
+        p_random_coins = World.get_probability_of_view(
+            1 - information_investment,
+            threshold=0.38,
+            steepness=10.0,
+            min_value=0.0,
+            proportion=0.03,
+        )
+        randomly_placed_coins = self.create_random_coins(p_random_coins)
+        coins_to_draw = visible_coins + randomly_placed_coins
         # Keep only a max percentage of coins
-        max_coins = int(self.count_coins() * 1)
-        coins = self._rng.choice(coins, size=max_coins, replace=False).tolist()
-
+        # max_coins = int(self.count_coins() * 1)
+        # coins = self._rng.choice(coins_to_draw, size=max_coins, replace=False).tolist()
+        max_coins = int(self.count_coins() * (1 + 1.1 * (1 - information_investment)))
+        sample_size = min(max_coins, len(coins_to_draw))
+        coins = self._rng.choice(coins_to_draw, size=sample_size, replace=False).tolist()
         # Draw coins that are randomly selected to be seen according to investment
         for (x, y) in coins:
-            if self._rng.random() < p:
-                terrain[y, x] = 255
+            # if self._rng.random() < p:
+            terrain[y, x] = 255
         return terrain.tolist()
 
     def generate_rgba_array(self, a_even=255, a_odd=140) -> List[float]:
