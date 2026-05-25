@@ -1,0 +1,365 @@
+{% macro manager_heatmap_placement(config) %}
+
+<style>
+.locating-foragers-root {
+    font-family: Arial, sans-serif;
+    background: #eceaea;
+    padding: 24px;
+    border-radius: 16px;
+}
+
+.locating-foragers-root .wrapper {
+    display: flex;
+    gap: 80px;
+    align-items: flex-start;
+}
+
+.locating-foragers-root .avatar-container {
+    position: relative;
+    width: 100px;
+    height: 220px;
+}
+
+.locating-foragers-root .avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-drag: element;
+    position: absolute;
+    z-index: 2;
+}
+
+.locating-foragers-root .drop-zone {
+    width: 520px;
+    height: 520px;
+    border: 3px dashed #777;
+    border-radius: 16px;
+    position: relative;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.locating-foragers-root .heatmap-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.locating-foragers-root .drop-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #777;
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.locating-foragers-root .debug-box {
+    margin-top: 16px;
+    padding: 10px;
+    background: #f4f4f4;
+    border-radius: 8px;
+    font-size: 13px;
+    white-space: pre-wrap;
+}
+</style>
+
+<div class="locating-foragers-root">
+    {% if config.prompt %}
+        <p><strong>{{ config.prompt }}</strong></p>
+    {% endif %}
+
+    <p>Information investment: <strong>{{ config.investment }} / {{ config.endowment }}</strong> coins</p>
+
+    <div class="wrapper">
+        <div class="avatar-container">
+            {% for i in range(config.num_foragers) %}
+            <img
+                src="/static/forager.png"
+                id="avatar{{ i + 1 }}"
+                class="avatar"
+                draggable="true"
+                style="left: 0px; top: {{ i * 110 }}px;"
+            >
+            {% endfor %}
+        </div>
+
+        <div id="dropZone" class="drop-zone">
+            <canvas id="heatmapCanvas" class="heatmap-canvas" width="520" height="520"></canvas>
+            <div class="drop-label">Drop avatars here</div>
+        </div>
+    </div>
+
+    <div id="debugBox" class="debug-box">Waiting for placements...</div>
+
+    <script>
+    (function () {
+        const root = document.currentScript.closest(".locating-foragers-root");
+
+        if (!root) {
+            console.error("locating-foragers-root not found");
+            return;
+        }
+
+        const avatars = root.querySelectorAll(".avatar");
+        const dropZone = root.querySelector("#dropZone");
+        const debugBox = root.querySelector("#debugBox");
+        const dropLabel = root.querySelector(".drop-label");
+
+        // ---- Heatmap (math lifted from commit 0651b80) ----
+        const W = {{ config.W }};
+        const H = {{ config.H }};
+        const ENDOWMENT = {{ config.endowment }};
+        const INVESTMENT = {{ config.investment }};
+        // arr[x][y] convention matches the demo; World.grid is [y][x] but we
+        // transpose at construction in ManagerHeatmapPlacementControl.
+        const ARR = {{ config.arr | tojson }};
+
+        const heatmapCanvas = root.querySelector("#heatmapCanvas");
+        const ctx = heatmapCanvas.getContext("2d");
+
+        // inferno palette + density-gradient view, per Edgar's call (2026-05-03)
+        const INFERNO_STOPS = [
+            [0.00, [255, 255, 255, 255]],
+            [0.12, [ 18,  10,  36, 255]],
+            [0.34, [ 86,  16,  83, 255]],
+            [0.58, [187,  55,  84, 255]],
+            [0.80, [249, 142,   8, 255]],
+            [1.00, [252, 255, 164, 255]]
+        ];
+        const BLOCK_SIZE = 2.5;  // 80 / 2.5 = 32 blocks per side
+
+        function sigmoidValue(x) {
+            return Math.max(0.2, 1.0 / (1.0 + Math.exp(-15 * (x - 0.5))));
+        }
+        function seededRandom01(x, y, sliderValue, salt) {
+            let s = (((x + 1) * 73856093) ^ ((y + 1) * 19349663) ^ ((sliderValue + 1) * 83492791) ^ salt) >>> 0;
+            s = (s * 1664525 + 1013904223) >>> 0;
+            return s / 4294967296;
+        }
+        function noisyIsDark(x, y, pView, sliderValue) {
+            const pNoiseCoin = 1 - pView;
+            if (seededRandom01(x, y, sliderValue, 17) < pNoiseCoin) return false;
+            if (ARR[x][y] === 140) {
+                return !(seededRandom01(x, y, sliderValue, 29) < pView);
+            }
+            return true;
+        }
+        function lerp(a, b, t) {
+            return [
+                Math.round(a[0] + (b[0] - a[0]) * t),
+                Math.round(a[1] + (b[1] - a[1]) * t),
+                Math.round(a[2] + (b[2] - a[2]) * t),
+                Math.round(a[3] + (b[3] - a[3]) * t)
+            ];
+        }
+        function heatColor(value) {
+            if (value <= 0) return [255, 255, 255, 255];
+            for (let i = 0; i < INFERNO_STOPS.length - 1; i++) {
+                const left = INFERNO_STOPS[i], right = INFERNO_STOPS[i + 1];
+                if (value <= right[0]) {
+                    const t = (value - left[0]) / (right[0] - left[0]);
+                    return lerp(left[1], right[1], t);
+                }
+            }
+            return INFERNO_STOPS[INFERNO_STOPS.length - 1][1].slice();
+        }
+
+        // Block aggregation: per-block density vs expected background → [0,1] value.
+        function blockEvidenceValues(mask) {
+            const blockColumns = Math.round(W / BLOCK_SIZE);
+            const blockRows = Math.round(H / BLOCK_SIZE);
+            const values = Array.from({ length: blockRows }, () => Array(blockColumns).fill(0));
+            const t = Math.max(0, Math.min(1, INVESTMENT / ENDOWMENT));
+            const pView = sigmoidValue(INVESTMENT / ENDOWMENT);
+            const expectedBackground = pView * (1 - pView);
+            const signalRange = Math.max(0.05, 1 - expectedBackground);
+            const intensityScale = 2.2 + 1.2 * t;
+            for (let row = 0; row < blockRows; row++) {
+                for (let col = 0; col < blockColumns; col++) {
+                    let evidence = 0, total = 0;
+                    const xStart = col * BLOCK_SIZE, yStart = row * BLOCK_SIZE;
+                    const xEnd = (col + 1) * BLOCK_SIZE, yEnd = (row + 1) * BLOCK_SIZE;
+                    const minCellX = Math.floor(xStart), minCellY = Math.floor(yStart);
+                    const maxCellX = Math.min(W, Math.ceil(xEnd)), maxCellY = Math.min(H, Math.ceil(yEnd));
+                    for (let y = minCellY; y < maxCellY; y++) {
+                        const cy = y + 0.5;
+                        if (cy < yStart || cy >= yEnd) continue;
+                        for (let x = minCellX; x < maxCellX; x++) {
+                            const cx = x + 0.5;
+                            if (cx < xStart || cx >= xEnd) continue;
+                            total++;
+                            if (mask[x][y]) evidence++;
+                        }
+                    }
+                    const density = total > 0 ? evidence / total : 0;
+                    const excess = Math.max(0, density - expectedBackground);
+                    values[row][col] = Math.min(1, Math.max(0, excess * intensityScale / signalRange));
+                }
+            }
+            return { values, blockColumns, blockRows };
+        }
+
+        function sampleBilinear(values, blockColumns, blockRows, x, y) {
+            const x0 = Math.max(0, Math.min(blockColumns - 1, Math.floor(x)));
+            const y0 = Math.max(0, Math.min(blockRows - 1, Math.floor(y)));
+            const x1 = Math.max(0, Math.min(blockColumns - 1, x0 + 1));
+            const y1 = Math.max(0, Math.min(blockRows - 1, y0 + 1));
+            const tx = Math.max(0, Math.min(1, x - x0));
+            const ty = Math.max(0, Math.min(1, y - y0));
+            const top = values[y0][x0] * (1 - tx) + values[y0][x1] * tx;
+            const bottom = values[y1][x0] * (1 - tx) + values[y1][x1] * tx;
+            return top * (1 - ty) + bottom * ty;
+        }
+
+        function gradientHeatValue(aggregated, px, py, width, height) {
+            const gy = (py + 0.5) / height * aggregated.blockRows - 0.5;
+            const gx = (px + 0.5) / width * aggregated.blockColumns - 0.5;
+            const raw = sampleBilinear(
+                aggregated.values, aggregated.blockColumns, aggregated.blockRows, gx, gy
+            );
+            const cutoff = 0.16;
+            const clipped = raw <= cutoff ? 0 : (raw - cutoff) / (1 - cutoff);
+            return Math.pow(Math.min(1, clipped * 1.25), 1.45);
+        }
+
+        function drawHeatmap() {
+            const pView = sigmoidValue(INVESTMENT / ENDOWMENT);
+            const mask = Array.from({ length: W }, () => Array(H).fill(false));
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    mask[x][y] = noisyIsDark(x, y, pView, INVESTMENT);
+                }
+            }
+            const aggregated = blockEvidenceValues(mask);
+            const width = heatmapCanvas.width;
+            const height = heatmapCanvas.height;
+            const image = ctx.createImageData(width, height);
+            for (let py = 0; py < height; py++) {
+                for (let px = 0; px < width; px++) {
+                    const value = gradientHeatValue(aggregated, px, py, width, height);
+                    const color = heatColor(value);
+                    const idx = (py * width + px) * 4;
+                    image.data[idx]     = color[0];
+                    image.data[idx + 1] = color[1];
+                    image.data[idx + 2] = color[2];
+                    image.data[idx + 3] = color[3];
+                }
+            }
+            ctx.imageSmoothingEnabled = false;
+            ctx.putImageData(image, 0, 0);
+        }
+        drawHeatmap();
+        if (dropLabel) dropLabel.style.display = "none";
+
+        // ---- Drag/drop (verbatim from position-foragers-control.html) ----
+        avatars.forEach(avatar => {
+            avatar.addEventListener("dragstart", e => {
+                e.dataTransfer.setData("text/plain", avatar.id);
+            });
+        });
+
+        dropZone.addEventListener("dragover", e => {
+            e.preventDefault();
+        });
+
+        function listenAvatarsPlaced() {
+            let avatarsPlacedDispatched = false;
+            return function checkAndDispatchAvatarsPlaced() {
+                const allDropped = Array.from(avatars).every(
+                    a => a.parentElement === dropZone
+                );
+                if (allDropped && !avatarsPlacedDispatched) {
+                    avatarsPlacedDispatched = true;
+                    root.dispatchEvent(new CustomEvent("AvatarsPlaced", { bubbles: true }));
+                }
+            };
+        }
+        const notifyAvatarsPlacedIfComplete = listenAvatarsPlaced();
+
+        dropZone.addEventListener("drop", e => {
+            e.preventDefault();
+
+            const id = e.dataTransfer.getData("text/plain");
+            const avatar = root.querySelector("#" + id);
+
+            if (!avatar) return;
+
+            const zoneRect = dropZone.getBoundingClientRect();
+
+            const x = e.clientX - zoneRect.left - avatar.offsetWidth / 2;
+            const y = e.clientY - zoneRect.top - avatar.offsetHeight / 2;
+
+            const clampedX = Math.max(0, Math.min(x, zoneRect.width - avatar.offsetWidth));
+            const clampedY = Math.max(0, Math.min(y, zoneRect.height - avatar.offsetHeight));
+
+            dropZone.appendChild(avatar);
+            avatar.style.position = "absolute";
+            avatar.style.left = clampedX + "px";
+            avatar.style.top = clampedY + "px";
+
+            updateDebug();
+            notifyAvatarsPlacedIfComplete();
+        });
+
+        function getPositions() {
+            const res = [];
+            const zoneRect = dropZone.getBoundingClientRect();
+            avatars.forEach(a => {
+                const placed = a.parentElement === dropZone;
+                let cx = null, cy = null, mx = null, my = null;
+                if (placed) {
+                    cx = parseFloat(a.style.left || "0") + a.offsetWidth / 2;
+                    cy = parseFloat(a.style.top || "0") + a.offsetHeight / 2;
+                    mx = Math.max(0, Math.min(W - 1, Math.floor((cx / zoneRect.width) * W)));
+                    my = Math.max(0, Math.min(H - 1, Math.floor((cy / zoneRect.height) * H)));
+                }
+                res.push({
+                    id: a.id,
+                    placed: placed,
+                    x: placed ? parseFloat(a.style.left || "0") : null,
+                    y: placed ? parseFloat(a.style.top || "0") : null,
+                    map_x: mx,
+                    map_y: my
+                });
+            });
+            return res;
+        }
+
+        function updateDebug() {
+            if (debugBox) {
+                debugBox.textContent = JSON.stringify(getPositions(), null, 2);
+            }
+        }
+
+        updateDebug();
+
+        // PsyNet: Next is enabled by the trial `submitEnable` event. Pair this with
+        // `submitEnable=Event(is_triggered_by=None, once=True)` on the page/control
+        // (see ManagerHeatmapPlacementControl.update_events) so the button starts disabled.
+        root.addEventListener("AvatarsPlaced", function () {
+            if (typeof psynet !== "undefined" && psynet.trial
+                    && typeof psynet.trial.registerEvent === "function") {
+                psynet.trial.registerEvent("submitEnable", {});
+            }
+        });
+
+        psynet.stageResponse = function () {
+            psynet.response.staged.rawAnswer = {
+                placements: getPositions(),
+                investment: INVESTMENT
+            };
+        };
+    })();
+    </script>
+</div>
+
+{% endmacro %}

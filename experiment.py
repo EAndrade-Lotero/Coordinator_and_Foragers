@@ -2,10 +2,11 @@
 ##########################################################################################
 # Imports
 ##########################################################################################
-from cProfile import label
-from typing import Union, Optional, List
+import json
 
+from pathlib import Path
 from markupsafe import Markup
+from typing import Union, Optional, List, Tuple, Dict
 
 import psynet.experiment
 from psynet.timeline import (
@@ -43,8 +44,11 @@ from .game_parameters import (
     WORLD_WIDTH,
     WORLD_HEIGHT,
     NUM_ROUNDS,
+    COLLECTION_CHANCE,
+    FUEL_PER_MOVE,
 )
 from .variable_handler import VariableHandler
+from .helper_classes import World
 
 logger = get_logger()
 variable_handler = VariableHandler()
@@ -88,6 +92,51 @@ class CustomControl(Control):
         super().__init__()
         self.test = "This is a new test"
 
+
+class ForagingControl(Control):
+    macro = "foraging_area"
+    external_template = "foraging-control.html"
+
+    def __init__(
+        self,
+        position: Tuple[int, int],
+        coins: List[Tuple[int, int]],
+        max_gear: int,
+        context:Dict[str, Path],
+    ) -> None:
+        super().__init__(
+            # show_next_button=False
+        )
+        self.pos_x = position[0]
+        self.pos_y = position[1]
+        logger.info("Entering page for foraging...")
+        # Create world from json
+        logger.info("Attempting to generate world...")
+        world = World.generate_from_coins(coins)
+        # logger.info(f"Coins in world: {self.world.coin_positions()}")
+        self.map = world.generate_terrain()
+        logger.info(f"Generated!")
+        self.forager_url = context["forager_url"]
+        self.coin_collected_url = context["coin_collected_url"]
+        self.map_url = world.map_path
+        self.num_foragers = NUM_FORAGERS
+        assert(1 <= max_gear <=3), f"Error: max_gear should be between 1 and 3, but got {max_gear}"
+        assert(isinstance(max_gear, int)), f"Error: max_gear should be an integer, but got {type(max_gear)}"
+        self.max_gear = max_gear - 1 # to convert to index
+        self.collection_chances = [COLLECTION_CHANCE(gear) for gear in range(1, 4)]
+        self.enabled = ['true' if i < max_gear else 'false' for i in range(3)]
+        self.fuel_per_move = FUEL_PER_MOVE
+        logger.info("Ready to start foraging...")
+
+    def format_answer(self, raw_answer, **kwargs):
+        try:
+            # assert raw_answer is not None
+            # assert isinstance(raw_answer, list)
+            # return raw_answer
+            logger.info(f"Coins foraged: {raw_answer}")
+            return raw_answer
+        except (ValueError, AssertionError):
+            return f"INVALID_RESPONSE"
 
 ##########################################################################################
 # Pages
@@ -230,6 +279,9 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
     time_estimate = 320
     accumulate_answers = True
 
+    with open("./static/map0.json") as f:
+        coins = json.load(f)
+
     def show_trial(self, experiment, participant):
         return join([
             InfoPage(
@@ -242,6 +294,17 @@ class ForagerTrial(RateTrialMixin, ImitationChainTrial):
                 control=PushButtonControl(
                     labels=["Next"],
                     choices=[0]
+                ),
+                time_estimate=self.time_estimate,
+            ),
+            ModularPage(
+                label="foraging",
+                prompt="Go forage!",
+                control=ForagingControl(
+                    position=(20, 20),
+                    coins=self.coins,
+                    max_gear=3,
+                    context=self.context,
                 ),
                 time_estimate=self.time_estimate,
             )

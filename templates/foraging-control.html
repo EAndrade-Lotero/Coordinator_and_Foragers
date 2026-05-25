@@ -1,0 +1,430 @@
+{% macro foraging_area(config) %}
+
+  <style>
+    :root { --bg:#0b0f14; --panel:#111826; --text:#e6edf3; --muted:#93a4b5; }
+    html, body { height: 85%; margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    .wrap {
+      height: 100%;
+      display: grid;
+      grid-template-columns: auto 240px;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    canvas {
+      background: #000;
+      border-radius: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .title { display:flex; align-items:center; gap:10px; font-weight: 700; letter-spacing:.2px; margin-bottom: 10px; color: rgba(212, 212, 212, 0.8);}
+    .row { margin-top: 14px; font-size: 13px; color: var(--muted); }
+    .g.disabled .badge { color: rgba(147,164,181,0.7); }
+    .scene { display: flex; align-items: center; gap: 14px; }
+    .fuel { width: 50px; display: grid; gap: 8px; justify-items: center; }
+    .fuelFrame {
+      width: 50px;
+      height: 400px;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(0,0,0,.14);
+      position: relative;
+      overflow: hidden;
+    }
+    .fuelFill {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 100%;
+      background: #f2dd83;
+    }
+    .fuelLabel { font-size: 12px; color: var(--muted); text-align: center; }
+
+    /* Put this on a parent that should anchor the minimap (often body) */
+.hud {
+  position: relative;
+}
+
+/* Minimap container pinned to top-right */
+.minimap {
+  position: absolute;
+  top: -20px;
+  right:100px;
+
+  width: 320px;
+  height: 180px;
+
+  border-radius: 12px;
+  border: 12px solid rgba(255, 255, 255, 0);
+  background: rgba(0, 0, 0, 0.35);
+
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+
+  overflow: hidden;
+  z-index: 50;
+
+  /* optional: keep it crisp for pixel art */
+  image-rendering: pixelated;
+}
+
+/* Optional header label */
+.minimap .minimap-label {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.9);
+
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  z-index: 2;
+}
+.next-btn{
+  background: #0d6efd;          /* vivid blue */
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 22px;
+
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 26px;
+  line-height: 1;
+
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(0,0,0,.18);
+}
+
+.next-btn:active{
+  transform: translateY(1px);
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+}
+.next-btn:disabled{
+  background: #9fc0ff;          /* lighter blue */
+  color: rgba(255,255,255,.9);
+  cursor: not-allowed;
+  opacity: 0.85;
+  box-shadow: none;
+  transform: none;
+}
+
+  </style>
+    <body>
+
+    <div class="hud">
+      <div class="minimap">
+        <div class="minimap-label">MINIMAP</div>
+        <canvas id="minimapCanvas"></canvas>
+      </div>
+    </div>
+
+  <div class="wrap">
+    <div class="scene">
+      <div class="fuel" aria-label="Fuel gauge">
+        <div class="fuelFrame">
+          <div id="fuelFill" class="fuelFill"></div>
+        </div>
+        <div id="fuelLabel" class="fuelLabel">Fuel: 100%</div>
+      </div>
+
+      <canvas id="cv" width="440" height="440"></canvas>
+    </div>
+
+    <aside class="panel">
+      <div class="row">Collection Info</div>
+      <div class="title" id="pos"></div>
+    </aside>
+  </div>
+{#    <div><button class="next-btn" id="nextBtn" disabled>Next</button></div>#}
+
+
+  <audio id="coinSound" src="{{ config.coin_collected_url }}" preload="auto"></audio>
+
+  <script>
+        let fuel = 100;          // 0..100
+        const fuelFill = document.getElementById("fuelFill");
+        const fuelLabel = document.getElementById("fuelLabel");
+
+        let world = {{ config.map }};
+        const WORLD_H = world.length;
+        const WORLD_W = world[0].length;
+        const VIEW = 11;
+        const CENTER = Math.floor(VIEW / 2); // 5
+
+        const canvas = document.getElementById("cv");
+        const ctx = canvas.getContext("2d");
+        const icon = new Image();
+        const icon_x = 200;
+        const icon_y = 200;
+        icon.src = "{{ config.forager_url }}";
+        icon.onload = () => {
+          ctx.drawImage(icon, icon_x, icon_y, 50, 50);
+        };
+        // HiDPI crispness
+        const cssSize = 440;
+        const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+        canvas.style.width = cssSize + "px";
+        canvas.style.height = cssSize + "px";
+        canvas.width = Math.floor(cssSize * dpr);
+        canvas.height = Math.floor(cssSize * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const cell = cssSize / VIEW;
+
+        const minimapCanvas = document.getElementById("minimapCanvas");
+        const mmW = minimapCanvas.width;
+        const mmH = minimapCanvas.height;
+
+        // Agent position in world coords
+        let ax = {{ config.pos_x }};
+        let ay = {{ config.pos_y }};
+        let coins_foraged = [];
+
+        // Gear = number of tiles moved per keypress
+        let max_gear = {{ config.max_gear }};
+        console.log("Maximum gear: ", Number(max_gear + 1));
+        const collection_chances = {{ config.collection_chances }};
+        const gears = [
+          { name: "Gear 1", tiles: 1, enabled: {{ config.enabled[0] }}  },
+          { name: "Gear 2", tiles: 2, enabled: {{ config.enabled[1] }} },
+          { name: "Gear 3", tiles: 3, enabled: {{ config.enabled[2] }}  }
+        ];
+        console.log("Gears available: ", gears);
+        let gearIdx = 0;
+        let collection_chance = collection_chances[gearIdx];
+        const posEl = document.getElementById("pos");
+
+
+        function clamp(v, lo, hi) {
+          return Math.max(lo, Math.min(hi, v));
+        }
+
+        // Convert world (x,y) -> minimap pixel (u,v)
+        function worldToMinimap(x, y) {
+          // Clamp to world bounds
+          x = clamp(x, 0, WORLD_W - 1);
+          y = clamp(y, 0, WORLD_H - 1);
+
+          const u = (x / (WORLD_W - 1)) * (mmW - 1);
+          const v = (y / (WORLD_H - 1)) * (mmH - 1);
+
+          return { u, v };
+        }
+
+        // Draw an "X" marker centered at (u,v)
+        function drawX(ctx, u, v, size = 4, lineWidth = 2, rgba = "rgba(255,255,255,0.9)") {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.save();
+          ctx.strokeStyle = rgba;
+          ctx.lineWidth = lineWidth;
+          ctx.lineCap = "round";
+
+          ctx.beginPath();
+          ctx.moveTo(u - size, v - size);
+          ctx.lineTo(u + size, v + size);
+          ctx.moveTo(u - size, v + size);
+          ctx.lineTo(u + size, v - size);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+
+        // Example usage
+        function renderMinimapMarker(x, y) {
+          const ctx = minimapCanvas.getContext("2d");
+
+          // If you want crisp pixels, set the canvas internal resolution explicitly:
+          // minimapCanvas.width = 180; minimapCanvas.height = 180;
+
+          const { u, v } = worldToMinimap(x, y);
+
+          // then marker
+          drawX(ctx, u, v, 5, 2, "rgba(255, 255, 255, 0.95)");
+        }
+
+
+        function render() {
+            ctx.clearRect(0, 0, cssSize, cssSize);
+
+            for (let vy = 0; vy < VIEW; vy++) {
+              for (let vx = 0; vx < VIEW; vx++) {
+                const wx = ax + (vx - CENTER);
+                const wy = ay + (vy - CENTER);
+
+                let col = "#0a0d12";
+                if (wx >= 0 && wx < WORLD_W && wy >= 0 && wy < WORLD_H) {
+                    const v = world[wy][wx];
+                    if (v === 0) {
+                        col = `rgba(${255}, ${215}, ${5}, ${0.8})`;
+                    } else {
+                        col = `rgb(${v}, ${v}, ${v})`;
+                    }
+
+                }
+
+                const px = vx * cell;
+                const py = vy * cell;
+
+                ctx.fillStyle = col;
+                ctx.fillRect(px, py, cell, cell);
+
+                ctx.strokeStyle = "rgba(255,255,255,0.08)";
+                ctx.strokeRect(px + 0.5, py + 0.5, cell - 1, cell - 1);
+
+                ctx.drawImage(icon, icon_x, icon_y, 50, 50);
+              }
+            }
+
+            posEl.textContent = `Coins foraged: ${coins_foraged.length}`;
+
+            // Draw fuel gauge
+            fuelFill.style.height = `${fuel}%`;
+            fuelLabel.textContent = `Fuel: ${fuel}%`;
+
+            // Draw minimap
+            renderMinimapMarker(ax, ay)
+        }
+
+        const coinSound = document.getElementById("coinSound");
+
+        function playCoinSound() {
+          // restart so rapid pickups can retrigger
+          coinSound.currentTime = 0;
+          coinSound.play().catch(() => {
+          });
+        }
+
+        function move(dx, dy) {
+            if (fuel <= {{ config.fuel_per_move }} / 100) {
+                {#document.getElementById("nextBtn").disabled = false;#}
+                return;
+            }
+
+            const new_x = Math.max(0, Math.min(WORLD_W - 1, ax + dx));
+            const new_y = Math.max(0, Math.min(WORLD_H - 1, ay + dy));
+
+            if (world[new_y][new_x] === 0) {
+
+                let p = Math.random();
+                console.log("draw collection:", [p, collection_chance]);
+                if (p < Number(collection_chance)) {
+                    coins_foraged.push([new_x, new_y]);
+                    world[new_y][new_x] = 200;
+                    playCoinSound();
+                }
+            }
+
+            ax = new_x;
+            ay = new_y;
+
+            // Render world
+            render();
+
+            // Decrement fuel
+            fuel = Math.max(0, fuel - {{ config.fuel_per_move }});
+        }
+
+        render();
+
+        function clipToGear(dx, dy) {
+          let cx = Math.min(gearIdx + 1, dx);
+          cx = Math.max(-(gearIdx + 1), cx);
+
+          let cy = Math.min(gearIdx + 1, dy);
+          cy = Math.max(-(gearIdx + 1), cy);
+          return [cx, cy];
+        }
+
+        function zigzagMoves(dx, dy) {
+          const moves = [];
+
+          const sx = Math.sign(dx); // -1, 0, or 1
+          const sy = Math.sign(dy);
+
+          let rx = Math.abs(dx);
+          let ry = Math.abs(dy);
+
+          // Choose which axis to start with.
+          // Here: start with the axis that has more remaining steps (tie -> horizontal).
+          let nextAxis = (rx >= ry) ? "horizontal" : "vertical";
+
+          while (rx > 0 || ry > 0) {
+            if (nextAxis === "horizontal") {
+              if (rx > 0) {
+                moves.push(["horizontal", sx]);
+                rx--;
+              }
+              nextAxis = "vertical";
+            } else {
+              if (ry > 0) {
+                moves.push(["vertical", sy]);
+                ry--;
+              }
+              nextAxis = "horizontal";
+            }
+          }
+
+          return moves;
+        }
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        async function animateMoves(e) {
+            const rect = canvas.getBoundingClientRect();
+
+            // Value in canvas
+            const px = e.clientX - rect.left;
+            const py = e.clientY - rect.top;
+
+            // Value in window
+            const tileX = Math.floor(px / cell);
+            const tileY = Math.floor(py / cell);
+
+            // Value in map
+            let dx = tileX - 5;
+            let dy = tileY - 5;
+
+            // Clip to max velocity
+            [dx, dy] = clipToGear(dx, dy)
+
+            const moves = zigzagMoves(dx, dy);
+
+            for (const [axis, step] of moves) {
+              if (axis === "horizontal") {
+                move(step, 0);
+                await sleep(80);
+              } else {
+                move(0, step);
+                await sleep(80);
+              }
+            }
+        }
+
+        canvas.addEventListener("pointerdown", (e) => animateMoves(e));
+        {#const btn = document.getElementById("nextBtn");#}
+        {##}
+        {#btn.addEventListener("click", (e) => {#}
+        {#  console.log("Button clicked!", e);#}
+        {#  window.dispatchEvent(new CustomEvent("foragerFinished"));#}
+        {#  console.log("coins foraged:", coins_foraged.length);#}
+        {#  psynet.trial.registerEvent(#}
+        {#    "foragerFinished",#}
+        {#    {info: {"coins_foraged":coins_foraged}}#}
+        {#  );#}
+        {#});#}
+
+        /////////////////////////////////////////////////////
+        // Function to stage the response for PsyNet
+        /////////////////////////////////////////////////////
+        psynet.stageResponse = function() {
+              psynet.response.staged.rawAnswer = coins_foraged;
+        }
+    </script>
+
+{% endmacro %}

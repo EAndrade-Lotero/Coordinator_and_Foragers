@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
 from psynet.modular_page import Control
+from psynet.timeline import Event
 from psynet.utils import get_logger
 
 from .game_parameters import (
@@ -71,4 +72,32 @@ class CustomSliderControl(Control):
             return float(raw_answer)
         except (ValueError, AssertionError):
             return f"INVALID_RESPONSE"
+
+
+class ManagerHeatmapPlacementControl(Control):
+    macro = "manager_heatmap_placement"
+    external_template = "manager-heatmap-placement.html"
+
+    def __init__(
+        self,
+        W: int,
+        H: int,
+        arr: List[List[int]],
+        endowment: int,
+        investment: int,
+        num_foragers: int,
+        prompt: Optional[str] = None,
+    ) -> None:
+        super().__init__()
+        self.W = W
+        self.H = H
+        self.arr = arr
+        self.endowment = endowment
+        self.investment = investment
+        self.num_foragers = num_foragers
+        self.prompt = prompt or ""
+
+    def update_events(self, events):
+        super().update_events(events)
+        events["submitEnable"] = Event(is_triggered_by=None, once=True)
 

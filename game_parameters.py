@@ -2,7 +2,7 @@
 import numpy as np
 
 NUM_FORAGERS = 2
-NUM_ROUNDS = 3
+NUM_ROUNDS = 1
 NUMBER_OF_TRIALS = 1
 MAX_NODES_PER_CHAIN = 2
 
